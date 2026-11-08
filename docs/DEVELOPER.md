@@ -245,7 +245,7 @@ The demo is a Mailchimp account, not a container: Mailchimp hosts the campaigns,
 
 Dependabot (`.github/dependabot.yml`) opens weekly pull requests: minor and patch updates grouped into one, GitHub Actions in another, each major update on its own. Merge one when CI is green and it doesn't change what the app supports.
 
-Some major versions are ignored on purpose: TypeScript (7.x is the native compiler; stay on 6.x until the type-checking and build tooling here is moved to it) and `@types/node` (the types must match the oldest Node version the app supports, Node 22, not the newest). Lift an ignore rule when the app moves to the new version.
+One major version is ignored on purpose: `@types/node` (the types must match the oldest Node version the app supports, Node 22, not the newest). Lift the ignore rule when the app moves to a new minimum Node version.
 
 ## Releasing
 
