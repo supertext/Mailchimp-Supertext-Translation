@@ -57,6 +57,8 @@ The demo is a Mailchimp account set up by hand (see `docs/DEVELOPER.md` → *Dem
 
 The user guide and installation guide include screenshots, taken by `npm run docs:screenshots` (Playwright, `tests/docs/screenshots.ts`) against the stand-in Mailchimp and Supertext APIs, which return real translations of the sample account (`tests/standin/samples.json`), stored in `docs/images/` at 1× scale with alt text, and regenerated in the same commit whenever the UI they show changes. Screenshots of Mailchimp's own screens (the Supertext folders, a translated draft) are added from the demo account once it exists. No secrets, no customer data, no local URLs.
 
+Demo movie: `npm run docs:movie` (`tests/docs/movie.ts`, shared kit in `tests/docs/movie/`) records `docs/images/demo.gif` (shown in the README) and a narrated MP4 that isn't committed; `npm run docs:movie:install` (`tests/docs/movie-install.ts`, same kit) records the connect and settings movie (MP4 only); see `docs/DEVELOPER.md` → *Demo movie*.
+
 ## Shared Supertext protocol
 
 AI file translation API v1, same as the WordPress plugin: POST HTML file → poll status → GET translation → DELETE. Details in `docs/DEVELOPER.md`. Never commit API keys or the Mailchimp client secret; use environment variables or the app's settings (stored encrypted).

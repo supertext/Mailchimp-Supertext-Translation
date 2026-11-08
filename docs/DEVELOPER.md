@@ -35,7 +35,7 @@ scripts/vendor-sdk.sh     updates vendor/supertext-sdk
 scripts/vendor-plugin-health.sh  updates vendor/supertext-plugin-health
 vendor/supertext-sdk/     the Supertext SDK (TypeScript, built), the app's `supertext-sdk` dependency; see *Supertext SDK*
 vendor/supertext-plugin-health/  Supertext Plugin Health (TypeScript, built), the app's `supertext-plugin-health` dependency; see *Supertext Plugin Health*
-tests/                    Vitest tests; standin/ (Mailchimp and Supertext stand-ins, sample account); docs/screenshots.ts
+tests/                    Vitest tests; standin/ (Mailchimp and Supertext stand-ins, sample account); docs/ (screenshots.ts, movie.ts, movie-install.ts, movie/ kit)
 ```
 
 ## How it fits into Mailchimp
@@ -195,6 +195,26 @@ npm run docs:screenshots   # Playwright, 1× scale, into docs/images/
 ```
 
 `tests/docs/screenshots.ts` starts the stand-ins and the app in-process, connects through the stand-in's OAuth and captures the app's pages (connect, settings with Translation review ticked for German (the review service is a second address of the Supertext stand-in), translate page, results, list afterwards, update warning, export for translation and the import summary after an HTML round trip, German UI). Regenerate them in the same commit as any UI change they show. Chromium: Playwright's own (`npx playwright install chromium`) or `CHROME=/path/to/chrome`. Screenshots of Mailchimp's own screens (the Supertext folders, a draft) follow from the demo account.
+
+## Demo movie
+
+`docs/images/demo.gif` (at the top of the README) is recorded by `tests/docs/movie.ts` with Supertext's shared movie kit (`tests/docs/movie/movie-kit.mjs`, types in `movie-kit.d.mts`, and `assets/`: intro and outro cards, caption bar, cursor, cuts the waiting time; Inter under the SIL OFL, `assets/fonts/Inter-LICENSE.txt`). Like the screenshot script it starts the stand-ins and the app in-process (`tests/docs/movie/app.ts`, free local ports; the Supertext stand-in takes 6 s per document so the waiting state shows), connects and saves the settings off camera, then shows, with a spoken line for every step (the GIF is silent): the Translate page with the sample campaigns, the autumn newsletter picked, German ticked (French unticked), *Translate into 1 language with Supertext*, the progress, the new German draft in the list and the result with *Open in Mailchimp*.
+
+```bash
+pip install piper-tts        # the voice (once)
+npm run docs:movie           # docs/images/demo.gif + tests/docs/movie/out/Mailchimp-Supertext-Translation.mp4
+npm run docs:movie:install   # tests/docs/movie/out/Mailchimp-Supertext-Translation-install.mp4
+```
+
+The MP4s are narrated with [Piper](https://pypi.org/project/piper-tts/): the kit's `say()` speaks each step's line, shows its caption and holds until the line is finished; the time spent making the speech is cut. The voice model (63 MB, pinned revision, checked by SHA-256) downloads itself once into `tests/docs/movie/voice/` (git-ignored; never commit it). Without Piper, or with `MOVIE_VOICE=0`, the movies are made silent with the captions only.
+
+Voice: Piper voice “alba” (en_GB), trained on a dataset from the University of Edinburgh's Centre for Speech Technology Research, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+It needs `ffmpeg` and writes 1280×720 at 30 fps. The GIF (800 px, 12 fps, keep it under 3 MB) is committed; the MP4s aren't: they go to `tests/docs/movie/out/` (git-ignored) or to `MOVIE_OUT`. Chromium as for the screenshots (`CHROME=/path`). Record them again when the Translate page or the settings change. The kit is the same in every Supertext plugin repo: don't restyle it here.
+
+### Install movie
+
+`tests/docs/movie-install.ts` records the install and configuration movie with the same kit and voice (MP4 only, no GIF). The app is hosted, so there is no install command: it shows the connect page and *Connect Mailchimp* (the stand-in approves at once; Mailchimp's login and consent are only told in one spoken line, not shown), then the settings: where the API key comes from, the fake key `st-demo-0000-0000-0000` typed into *API key*, the language of the campaigns, German ticked with the *Supertext code* Swiss High German (de-CH), *Translation review* left off, the *Mailchimp folders* trigger (*Supertext → German*) in one line, *Save* and the API key check, and finally the *Translate* page.
 
 ## CI
 

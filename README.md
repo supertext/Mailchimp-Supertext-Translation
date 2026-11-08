@@ -2,6 +2,8 @@
 
 Translate your Mailchimp campaigns with [Supertext](https://www.supertext.com) AI. Each language gets its own draft next to the original, with the subject line, preview text and content translated and the audience set to the subscribers who speak that language. Start a translation right in Mailchimp, by moving a campaign into a **Supertext** folder, or pick the campaign and languages on the app's own page.
 
+![Demo: on the app's Translate page, the autumn newsletter is picked, German ticked and Translate with Supertext clicked; a few seconds later a new German draft is in Mailchimp](docs/images/demo.gif)
+
 > **Status: in development.** The app works against a stand-in of the Mailchimp API (tests, screenshots). Testing on a real Mailchimp account is the next step; see [Known limitations](docs/DEVELOPER.md#known-limitations--roadmap).
 
 ![Translate with Supertext: the Autumn newsletter selected, French and German ticked](docs/images/translate-page.png)
