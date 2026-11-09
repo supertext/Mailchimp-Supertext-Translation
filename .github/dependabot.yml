@@ -7,8 +7,6 @@ updates:
     open-pull-requests-limit: 5
     # Major versions we can't take yet (see docs/DEVELOPER.md → Dependency updates):
     ignore:
-      - dependency-name: "typescript"  # TypeScript 7 is the native compiler; the tooling here still needs 5.x
-        update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"  # types must match the oldest supported Node version (22), not the newest
         update-types: ["version-update:semver-major"]
     groups:

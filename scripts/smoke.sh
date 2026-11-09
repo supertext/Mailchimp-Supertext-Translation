@@ -56,7 +56,12 @@ for i in $(seq 1 30); do
   sleep 1
 done
 grep -q 'Ihr Adventskalender kann bestellt werden' <<< "$campaigns" || fail 'draft from the folder trigger'
-advent=$(curl -fs "$mc/3.0/campaigns/c-advent" -H 'Authorization: Bearer standin-token')
+# The draft appears a moment before the original is moved back: wait for both.
+for i in $(seq 1 10); do
+  advent=$(curl -fs "$mc/3.0/campaigns/c-advent" -H 'Authorization: Bearer standin-token')
+  grep -q '"folder_id":"f-seasonal"' <<< "$advent" && break
+  sleep 1
+done
 grep -q '"folder_id":"f-seasonal"' <<< "$advent" || fail 'original moved back to its folder'
 
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST $app/api/jobs -H 'Content-Type: application/json' -d '{}')

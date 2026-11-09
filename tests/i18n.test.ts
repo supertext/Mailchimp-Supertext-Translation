@@ -4,7 +4,17 @@ import { errorInfo } from '../src/i18n/error.js';
 import { LOCALES, MESSAGES, localeFromRequest, resolveLocale, translator } from '../src/i18n/index.js';
 import { SupertextClient } from '../src/supertext/client.js';
 import { fromSdk } from '../src/supertext/client.js';
-import { languageName, resolvedTarget, supertextCodeOf, supertextSource, supertextTarget, supportsPoliteness } from '../src/translation/languages.js';
+import {
+  languageName,
+  resolvedTarget,
+  suggestedTarget,
+  SUPERTEXT_TARGETS,
+  supertextCodeOf,
+  supertextSource,
+  supertextTarget,
+  supportsPoliteness,
+  targetOptions,
+} from '../src/translation/languages.js';
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 const urls = (text: string) => [...text.matchAll(/https:\/\/\S+?(?=[\s;)]|\.?$|\. )/g)].map((m) => m[0]).sort();
@@ -73,23 +83,36 @@ describe('languages', () => {
     expect(languageName('no', 'en')).toBe('Norwegian Bokmål');
   });
 
-  it("sends the account's Supertext code, else an exact match, and never guesses a region", () => {
+  it("sends the account's Supertext code, else an exact match, else the SDK default, and guesses nothing else", () => {
     expect(supertextTarget('de', { de: 'de-CH' })).toBe('de-CH');
     expect(supertextTarget('es', {})).toBe('es');
-    expect(supertextTarget('zh', { zh: 'zh-Hans' })).toBe('zh-Hans');
-    expect(resolvedTarget('de', {})).toBeNull();
+    expect(supertextTarget('zh', { zh: 'zh-Hant' })).toBe('zh-Hant');
+    expect(resolvedTarget('de', {})).toBe('de-DE');
+    expect(resolvedTarget('zh', {})).toBe('zh-Hans');
+    expect(resolvedTarget('sr', {})).toBe('sr-Latn');
+    expect(suggestedTarget('pt')).toBe('pt-PT');
+    expect(suggestedTarget('es')).toBe('es');
+    expect(suggestedTarget('no')).toBeNull();
     expect(resolvedTarget('no', {})).toBeNull();
+    expect(resolvedTarget('ar', {})).toBeNull();
     expect(resolvedTarget('no', { no: 'nb' })).toBe('nb');
     const error = (() => {
       try {
-        supertextTarget('fr', {});
+        supertextTarget('no', {});
       } catch (caught) {
         return fromSdk(caught) as { message: string; code: string; params: Record<string, string> };
       }
     })();
     expect(error?.code).toBe('unsupportedLanguage');
-    expect(error?.params).toEqual({ code: 'fr' });
-    expect(translator('it').error(error!)).toContain('«fr»');
+    expect(error?.params).toEqual({ code: 'no' });
+    expect(translator('it').error(error!)).toContain('«no»');
+  });
+
+  it('offers Supertext targets as "Name (code)" in the interface language', () => {
+    const options = targetOptions('de');
+    expect(options.map((option) => option.code).sort()).toEqual([...SUPERTEXT_TARGETS].sort());
+    expect(options.find((option) => option.code === 'de-CH')?.label).toBe('Schweizer Hochdeutsch (de-CH)');
+    expect(options.find((option) => option.code === 'gsw-u-sd-chzh')?.label).toMatch(/\(gsw-u-sd-chzh\)$/);
   });
 
   it('accepts only Supertext codes as the mapping, in their exact form', () => {

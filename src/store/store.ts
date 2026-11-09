@@ -30,6 +30,11 @@ export interface Account {
    * as it is ("es"); otherwise it fails with `unsupportedLanguage`.
    */
   languageCodes: Record<string, string>;
+  /**
+   * Mailchimp codes of the languages with Translation review on (Settings → Languages): translations
+   * into them go through Supertext's review service (SUPERTEXT_REVIEW_URL), all others directly to Supertext.
+   */
+  reviewLanguages: string[];
   /** Start translations by moving a campaign into a Supertext folder. */
   folderTrigger: boolean;
   /** Start translations on the app's Translate page. */
@@ -58,6 +63,7 @@ export const defaultAccount = (accountId: string): Account => ({
   sourceLanguage: 'en',
   targets: [],
   languageCodes: {},
+  reviewLanguages: [],
   folderTrigger: true,
   appTrigger: true,
   limitOriginal: true,

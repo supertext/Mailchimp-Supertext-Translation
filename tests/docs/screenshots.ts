@@ -9,7 +9,7 @@
  */
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { chromium, type Locator, type Page } from 'playwright';
 import { createApp } from '../../src/app.js';
@@ -35,6 +35,8 @@ async function main() {
   const mailchimpUrl = await listen((request) => mailchimp.handle(request));
   mailchimp.apiBase = mailchimpUrl;
   const supertextUrl = await listen((request) => supertext.handle(request));
+  // The review service speaks the same API: a second address of the same stand-in, never the live one.
+  const reviewUrl = await listen((request) => supertext.handle(request));
   const port = 8790;
   const appUrl = `http://127.0.0.1:${port}`;
   const app = createApp({
@@ -44,6 +46,7 @@ async function main() {
       MAILCHIMP_CLIENT_SECRET: 'screenshots-secret',
       MAILCHIMP_LOGIN_BASE: mailchimpUrl,
       SUPERTEXT_API_ENDPOINT: `${supertextUrl}/v1/`,
+      SUPERTEXT_REVIEW_URL: `${reviewUrl}/v1/`,
       // Version reports go to the stand-in, never to the live Commando Center.
       SUPERTEXT_REPORT_URL: `${supertextUrl}/report`,
       FOLDER_POLL_SECONDS: '0',
@@ -70,9 +73,10 @@ async function main() {
   await page.fill('input[name="apiKey"]', 'Supertext-Auth-Key 0123456789abcdef');
   await page.selectOption('select[name="sourceLanguage"]', 'en');
   for (const code of ['de', 'fr', 'it']) await page.check(`#t-${code}`);
-  await page.fill('input[name="code:de"]', 'de-CH');
-  await page.fill('input[name="code:fr"]', 'fr-CH');
-  await page.fill('input[name="code:it"]', 'it-CH');
+  await page.selectOption('select[name="code:de"]', 'de-CH');
+  await page.selectOption('select[name="code:fr"]', 'fr-CH');
+  await page.selectOption('select[name="code:it"]', 'it-CH');
+  await page.check('input[name="review"][value="de"]');
   await page.click('button.primary');
   await page.waitForSelector('.notice.success');
   await page.click('#test-button');
@@ -109,6 +113,24 @@ async function main() {
   // Updating existing drafts: the warning.
   await page.check('#overwrite');
   await shot('overwrite-warning', page.locator('#translate-form'));
+
+  // Translation files: the Advent offer exported as HTML for French, translated, imported.
+  await page.goto(appUrl);
+  await page.check('input[name="campaign"][value="c-advent"]');
+  await page.check('input[name="file-format"][value="html"]');
+  for (const code of ['de', 'it']) await page.uncheck(`input[name="export-language"][value="${code}"]`);
+  await shot('export-for-translation', page.locator('#export-card'));
+  const [download] = await Promise.all([page.waitForEvent('download'), page.click('#export-button')]);
+  const exported = Buffer.concat(await (await download.createReadStream()).toArray()).toString('utf8');
+  // A translator's work: the stand-in's French translations of the sample texts.
+  const french = (JSON.parse(readFileSync(new URL('../standin/samples.json', import.meta.url), 'utf8')) as Record<string, Record<string, string>>).fr;
+  const translated = exported.replace(/(<div data-st-id="\d+">)([\s\S]*?)(<\/div>)/g, (all, open: string, inner: string, close: string) =>
+    french[inner] ? `${open}${french[inner]}${close}` : all,
+  );
+  await page.setInputFiles('#import-form input[name="file"]', { name: 'mailchimp-c-advent-fr-CH.html', mimeType: 'text/html', buffer: Buffer.from(translated) });
+  await page.click('#import-button');
+  await page.waitForSelector('#import-result .notice');
+  await shot('import-summary', page.locator('#import-form'));
 
   // The page in German.
   await page.goto(`${appUrl}/?lang=de`);

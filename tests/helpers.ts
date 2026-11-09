@@ -11,11 +11,15 @@ export function setup(env: Record<string, string> = {}) {
   const mailchimp = createMailchimpStandin('https://mailchimp.test');
   const supertext = createSupertextStandin();
   const store = new MemoryStore();
+  /** Every request to Supertext or its review service (method and URL), in order. */
+  const supertextRequests: string[] = [];
   const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
     const request = new Request(input, init);
     const host = new URL(request.url).host;
     if (host === 'mailchimp.test') return mailchimp.handle(request);
-    if (host === 'supertext.test' || host === 'center.test') return supertext.handle(request);
+    if (host === 'supertext.test' || host === 'review.test') supertextRequests.push(`${request.method} ${request.url}`);
+    // review.test: the review service (it speaks the same API, so the stand-in answers it too).
+    if (host === 'supertext.test' || host === 'review.test' || host === 'center.test') return supertext.handle(request);
     throw new Error(`Unexpected request to ${request.url}`);
   }) as typeof fetch;
   const config = loadConfig({
@@ -26,6 +30,7 @@ export function setup(env: Record<string, string> = {}) {
     SESSION_SECRET: 'session-secret',
     SUPERTEXT_API_ENDPOINT: 'https://supertext.test/v1/',
     SUPERTEXT_API_KEY: 'server-key',
+    SUPERTEXT_REVIEW_URL: 'https://review.test/v1/',
     // Version reports go to the stand-in (supertext.reports), never to the live Commando Center.
     SUPERTEXT_REPORT_URL: 'https://center.test/api/v1/report',
     FOLDER_POLL_SECONDS: '0',
@@ -95,7 +100,7 @@ export function setup(env: Record<string, string> = {}) {
   const clearCookies = () => {
     cookies = {};
   };
-  return { app, mailchimp, supertext, store, config, request, connect, csrf, api, saveSettings, settle, onJob, fetchFn, clearCookies };
+  return { app, mailchimp, supertext, supertextRequests, store, config, request, connect, csrf, api, saveSettings, settle, onJob, fetchFn, clearCookies };
 }
 
 /** The usual settings: German and French, folders and app, original limited. */

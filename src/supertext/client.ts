@@ -6,13 +6,22 @@
  */
 
 import { LocalizedError, type MessageParams } from '../i18n/error.js';
-import { SupertextClient as SdkClient, SupertextError as SdkError, type ApiKeyCheck, type FetchLike } from 'supertext-sdk/v1';
+import { LIVE_BASE_URL, SupertextClient as SdkClient, SupertextError as SdkError, type ApiKeyCheck, type FetchLike } from 'supertext-sdk/v1';
 import { VERSION } from '../version.js';
 
 export { retryDelayMs } from 'supertext-sdk/v1';
 
 /** The User-Agent suffix of every Supertext request (the GitHub repository name and version). */
 export const USER_AGENT = `Mailchimp-Supertext-Translation/${VERSION || 'dev'}`;
+
+/**
+ * Supertext's review service (the translation proxy of Supertext Localization Review). It speaks
+ * the same API v1 and forwards to the live Supertext API with the account's key, keeping every
+ * translation so reviewers can correct them; corrections come back with the next translation.
+ * Used for languages with *Translation review* on (Settings → Languages). SUPERTEXT_REVIEW_URL
+ * replaces it ('' = review off for every language).
+ */
+export const REVIEW_URL = 'https://localizationreview-production.up.railway.app/v1/';
 
 /** `more`: formal address (Sie, vous, Lei). `less`: informal (du, tu). `default`: Supertext decides. */
 export type Politeness = 'default' | 'more' | 'less';
@@ -23,6 +32,8 @@ export interface ClientOptions {
   endpoint?: string;
   pollIntervalMs?: number;
   pollTimeoutMs?: number;
+  /** The review service for languages with Translation review on ('' or unset = none). */
+  reviewEndpoint?: string;
   /** Injected for tests. */
   fetch?: typeof fetch;
   /** Injected for tests. */
@@ -51,11 +62,14 @@ export class SupertextError extends LocalizedError {
 
 export class SupertextClient {
   private readonly client: SdkClient;
+  private readonly options: ClientOptions;
+  private reviewClient?: SupertextClient;
 
   constructor(options: ClientOptions) {
     if (!options.apiKey?.trim()) {
       throw new SupertextError('No Supertext API key configured.', 'noApiKey');
     }
+    this.options = options;
     this.client = new SdkClient(options.apiKey, {
       baseUrl: options.endpoint || undefined,
       pollIntervalMs: options.pollIntervalMs,
@@ -64,6 +78,21 @@ export class SupertextClient {
       fetch: options.fetch as FetchLike | undefined,
       sleep: options.sleep,
     });
+  }
+
+  /**
+   * The client for one target language: the review service when the language has Translation
+   * review on (same key, timeouts, transport and User-Agent; created once), else this one.
+   * Without a review URL, or with the same URL as the API, always this one. A document is
+   * submitted, polled, downloaded and deleted by the same client (translateSegments does the
+   * whole round trip), so a job is always collected where it was submitted.
+   */
+  forReview(review: boolean): SupertextClient {
+    const reviewUrl = (this.options.reviewEndpoint ?? '').trim();
+    const same = (a: string, b: string) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
+    if (!review || !reviewUrl || same(reviewUrl, this.options.endpoint || LIVE_BASE_URL)) return this;
+    this.reviewClient ??= new SupertextClient({ ...this.options, endpoint: reviewUrl, reviewEndpoint: '' });
+    return this.reviewClient;
   }
 
   /**

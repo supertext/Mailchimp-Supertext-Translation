@@ -34,32 +34,71 @@ export type TranslateResult = Pick<JobItem, 'state' | 'targetId' | 'webId' | 'no
 
 const TEMPLATE_TYPES = new Set(['template', 'drag_and_drop']);
 
+/** A campaign's texts, each with the key it has in translation files. */
+export interface CollectedCampaign {
+  /** subject, preview, body.<n> (the n-th text of the HTML, or the plain-text body as body.0). */
+  segments: { key: string; segment: EmailSegment }[];
+  plainText: boolean;
+  document?: EmailDocument;
+}
+
+/**
+ * The texts to translate (the API translation and translation files share it):
+ * the subject line (`subject`), the preview text (`preview`) and the content
+ * (`body.0`, `body.1` … in the order of EmailDocument's segments).
+ */
+export function collectSegments(source: Campaign, content: CampaignContent): CollectedCampaign {
+  const plainText = source.type === 'plaintext';
+  const document = plainText ? undefined : new EmailDocument(content.html ?? '');
+  const segments: CollectedCampaign['segments'] = [];
+  const subject = source.settings.subject_line ?? '';
+  const preview = source.settings.preview_text ?? '';
+  if (subject.trim()) segments.push({ key: 'subject', segment: plainSegment(subject) });
+  if (preview.trim()) segments.push({ key: 'preview', segment: plainSegment(preview) });
+  const body: EmailSegment[] = plainText ? [plainSegment(content.plain_text ?? '')] : document!.segments;
+  body.forEach((segment, index) => segments.push({ key: `body.${index}`, segment }));
+  return { segments, plainText, document };
+}
+
 export async function translateCampaign(args: TranslateArgs): Promise<TranslateResult> {
   const { source, content, target } = args;
   if (target && !args.overwrite) {
     return { state: 'kept', targetId: target.id, webId: target.web_id };
   }
+  const collected = collectSegments(source, content);
+  // All segments of one language through the SDK (packed into as few documents as the size limit allows).
+  const translated = await args.supertext.translateSegments(
+    collected.segments.map(({ segment }) => segment.html),
+    { targetLanguage: args.supertextTarget, sourceLanguage: args.sourceLanguage, politeness: args.politeness },
+  );
+  const byKey = new Map(collected.segments.map(({ key }, i) => [key, translated[i]]));
+  return writeDraft(args, collected, byKey);
+}
 
-  // What to translate.
-  const plainText = source.type === 'plaintext';
-  const document = plainText ? undefined : new EmailDocument(content.html ?? '');
-  const head: EmailSegment[] = [];
+export type DraftArgs = Pick<TranslateArgs, 'mailchimp' | 'source' | 'target' | 'language' | 'folderId'>;
+
+/**
+ * Writes the translations (segment key → Supertext's HTML, merge tags as
+ * placeholders) to the language's draft: a replica of the original, or the
+ * existing draft. A key without a translation keeps the original's text.
+ */
+export async function writeDraft(args: DraftArgs, collected: CollectedCampaign, translations: ReadonlyMap<string, string>): Promise<TranslateResult> {
+  const { source, target } = args;
+  const valueOf = (key: string, segment: EmailSegment) => translations.get(key) ?? segment.html;
+  const find = (key: string) => collected.segments.find((s) => s.key === key);
   const subject = source.settings.subject_line ?? '';
   const preview = source.settings.preview_text ?? '';
-  if (subject.trim()) head.push(plainSegment(subject));
-  if (preview.trim()) head.push(plainSegment(preview));
-  const body: EmailSegment[] = plainText ? [plainSegment(content.plain_text ?? '')] : document!.segments;
-  const segments = [...head, ...body];
-
-  const translated = await translateSegments(args, segments);
-  let index = 0;
-  const translatedSubject = subject.trim() ? segmentResult(head[index], translated.get(index++)!) : subject;
-  const translatedPreview = preview.trim() ? segmentResult(head[index], translated.get(index++)!) : preview;
+  const subjectSegment = find('subject');
+  const previewSegment = find('preview');
+  const translatedSubject = subjectSegment ? segmentResult(subjectSegment.segment, valueOf('subject', subjectSegment.segment)) : subject;
+  const translatedPreview = previewSegment ? segmentResult(previewSegment.segment, valueOf('preview', previewSegment.segment)) : preview;
+  const body = collected.segments.filter(({ key }) => key.startsWith('body.'));
   const bodyTranslations = new Map<number, string>();
-  body.forEach((_, i) => bodyTranslations.set(i, translated.get(head.length + i)!));
+  body.forEach(({ key, segment }, i) => bodyTranslations.set(i, valueOf(key, segment)));
+  const { document, plainText } = collected;
   // Checks every merge tag before anything is written to Mailchimp.
   const html = document ? document.apply(bodyTranslations) : undefined;
-  const plain = plainText ? segmentResult(body[0], bodyTranslations.get(0)!) : undefined;
+  const plain = plainText ? segmentResult(body[0].segment, bodyTranslations.get(0)!) : undefined;
 
   // Where it goes.
   const created = target ? undefined : await args.mailchimp.replicate(source.id);
@@ -101,13 +140,4 @@ export async function translateCampaign(args: TranslateArgs): Promise<TranslateR
     throw error;
   }
   return { state: target ? 'updated' : 'created', targetId: draft.id, webId: draft.web_id, notes };
-}
-
-/** All segments of one language through the SDK (packed into as few documents as the size limit allows). */
-async function translateSegments(args: TranslateArgs, segments: EmailSegment[]): Promise<Map<number, string>> {
-  const translated = await args.supertext.translateSegments(
-    segments.map((segment) => segment.html),
-    { targetLanguage: args.supertextTarget, sourceLanguage: args.sourceLanguage, politeness: args.politeness },
-  );
-  return new Map(translated.map((html, i) => [i, html]));
 }

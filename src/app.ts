@@ -8,10 +8,12 @@ import { authorizeUrl, exchangeCode, MailchimpClient } from './mailchimp/client.
 import { SupertextClient } from './supertext/client.js';
 import { defaultAccount, type Account, type Store } from './store/store.js';
 import { removeFolders, syncFolders } from './translation/folders.js';
+import { exportFile, importFile, refuseLargeUpload } from './translation/files.js';
 import { startJob, type JobDeps } from './translation/jobs.js';
 import { isLanguage, supertextCodeOf } from './translation/languages.js';
 import { Reporting } from './reporting.js';
 import { ConnectPage } from './views/connect.js';
+import { ImportSummaryPanel } from './views/files.js';
 import { JobPanel } from './views/job.js';
 import { appUrl, type PageContext } from './views/layout.js';
 import { KeyCheckMessage, keyCheckText, SettingsPage } from './views/settings.js';
@@ -42,6 +44,7 @@ export function services(deps: AppDeps) {
     new SupertextClient({
       apiKey: account.apiKey || config.supertextApiKey,
       endpoint: config.supertextEndpoint || undefined,
+      reviewEndpoint: config.reviewUrl,
       fetch: deps.fetch,
     });
   const reporting = new Reporting({ config, store: deps.store, fetch: deps.fetch, onTask: deps.onJob });
@@ -282,6 +285,58 @@ export function createApp(deps: AppDeps) {
     return c.json({ status: job.status, html });
   });
 
+  /** *Export for translation*: one campaign, XLIFF (one or more languages) or HTML (one) → the file as a download. */
+  app.post('/api/files/export', async (c) => {
+    const session = await apiSession(c, true);
+    if (session instanceof Response) return session;
+    const { account } = session;
+    const t = tr(c);
+    const body = (await c.req.json().catch(() => ({}))) as { campaignId?: string; languages?: string[]; format?: string };
+    try {
+      if (!body.campaignId || typeof body.campaignId !== 'string') {
+        throw new LocalizedError('Select a campaign to export.', 'fileSelectOne');
+      }
+      const file = await exportFile(store, account, mailchimp(account), {
+        campaignId: body.campaignId,
+        languages: (body.languages ?? []).filter((code) => typeof code === 'string'),
+        format: body.format === 'html' ? 'html' : 'xliff',
+      });
+      return c.body(file.content, 200, {
+        'Content-Type': file.contentType,
+        'Content-Disposition': `attachment; filename="${file.filename.replace(/[^\w.-]/g, '_')}"`,
+        'Cache-Control': 'no-store',
+      });
+    } catch (error) {
+      const info = errorInfo(error);
+      return c.json({ error: info, text: t.error(info) }, 400);
+    }
+  });
+
+  /** *Import translation*: one uploaded file (≤ 10 MB, parsed in memory, never stored) → the languages' drafts, summary HTML. */
+  app.post('/api/files/import', async (c) => {
+    const session = await apiSession(c, true);
+    if (session instanceof Response) return session;
+    const { account } = session;
+    const t = tr(c);
+    try {
+      refuseLargeUpload(c.req.header('content-length'));
+      const form = await c.req.parseBody();
+      const file = form.file;
+      if (!(file instanceof File) || file.size === 0) throw new LocalizedError('Choose a file.', 'fileChoose');
+      refuseLargeUpload(undefined, file);
+      const summaries = await importFile(store, account, mailchimp(account), await file.text(), {
+        includeChanged: form.includeChanged === '1',
+        overwrite: form.overwrite === '1',
+        uiLocale: t.locale,
+      });
+      const html = (await ImportSummaryPanel({ t, summaries, dc: account.dc }).toString()).toString();
+      return c.json({ summaries, html });
+    } catch (error) {
+      const info = errorInfo(error);
+      return c.json({ error: info, text: t.error(info) }, 400);
+    }
+  });
+
   app.post('/api/test', async (c) => {
     const session = await apiSession(c, true);
     if (session instanceof Response) return session;
@@ -322,6 +377,7 @@ export function createApp(deps: AppDeps) {
           serverKey: Boolean(config.supertextApiKey),
           reportsEnabled: reporting.enabled(session.account),
           reportsFixed: reporting.fixedByEnvironment,
+          reviewAvailable: Boolean(config.reviewUrl),
           saved: c.req.query('saved') === '1',
           invalidCodes: c.req.query('invalid') || undefined,
           foldersError: c.req.query('folders') || undefined,
@@ -364,6 +420,8 @@ export function createApp(deps: AppDeps) {
       else invalid.push(code);
     }
     account.languageCodes = codes;
+    const review = form.review === undefined ? [] : Array.isArray(form.review) ? form.review : [form.review];
+    account.reviewLanguages = [...new Set(review.map(String))].filter((code) => isLanguage(code));
     if (!reporting.fixedByEnvironment) account.versionReports = field('versionReports') === '1';
     account.folderTrigger = field('folderTrigger') === '1';
     account.appTrigger = field('appTrigger') === '1';

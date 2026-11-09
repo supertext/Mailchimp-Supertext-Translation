@@ -8,10 +8,10 @@ import {
   LANGUAGE_CODES,
   languageName,
   resolvedTarget,
-  SUPERTEXT_TARGETS,
-  supertextCodeOf,
+  suggestedTarget,
   supertextSource,
   supportsPoliteness,
+  targetOptions,
 } from '../translation/languages.js';
 import { releaseUrl, VERSION } from '../version.js';
 import { API_KEY_URL, ApiKeyHelp, Layout, Notice, SIGNUP_URL, splitTemplate, type PageContext } from './layout.js';
@@ -62,6 +62,8 @@ export interface SettingsPageProps {
   reportsEnabled: boolean;
   /** SUPERTEXT_VERSION_REPORTS decides, so the checkbox can't be changed. */
   reportsFixed: boolean;
+  /** A review service is configured (SUPERTEXT_REVIEW_URL isn't ''): the Translation review column is shown. */
+  reviewAvailable: boolean;
   saved?: boolean;
   invalidCodes?: string;
   foldersError?: string;
@@ -89,6 +91,7 @@ export function SettingsPage(props: SettingsPageProps) {
   });
   const names = (codes: string[]) => codes.map((code) => languageName(code, t.locale)).join(', ');
   const check = Reporting.lastCheck(account);
+  const options = targetOptions(t.locale);
 
   return (
     <Layout ctx={ctx} title={heading}>
@@ -173,45 +176,62 @@ export function SettingsPage(props: SettingsPageProps) {
                 <th></th>
                 <th></th>
                 <th>{t.t('settings.languages.code')}</th>
-                <th>{t.t('settings.languages.sent')}</th>
+                {props.reviewAvailable && <th>{t.t('settings.languages.review')}</th>}
               </tr>
             </thead>
             <tbody>
               {ordered.map((code) => {
                 const chosen = account.targets.includes(code);
-                const exact = supertextCodeOf(code);
-                const sent = resolvedTarget(code, account.languageCodes);
+                const saved = account.languageCodes[code];
+                const selected = saved ?? suggestedTarget(code) ?? '';
+                const known = options.some((option) => option.code === selected);
                 return (
-                  <tr class={chosen ? 'chosen' : 'other'}>
+                  <tr class={`${chosen ? 'chosen' : 'other'}${selected ? '' : ' missing'}`}>
                     <td class="check">
                       <input type="checkbox" name="target" value={code} id={`t-${code}`} checked={chosen} />
                     </td>
                     <td>
-                      <label for={`t-${code}`}>{languageName(code, t.locale)}</label>
+                      <label for={`t-${code}`}>{languageName(code, t.locale)}</label> <code class="muted">{code}</code>
                     </td>
                     <td>
-                      <input
-                        name={`code:${code}`}
-                        value={account.languageCodes[code] ?? ''}
-                        placeholder={exact ?? ''}
-                        list="supertext-codes"
-                        size={14}
-                        aria-label={`${t.t('settings.languages.code')}: ${languageName(code, t.locale)}`}
-                      />
+                      <select name={`code:${code}`} aria-label={`${t.t('settings.languages.code')}: ${languageName(code, t.locale)}`}>
+                        {!selected && (
+                          <option value="" selected>
+                            {t.t('settings.languages.choose')}
+                          </option>
+                        )}
+                        {selected && !known && (
+                          <option value={selected} selected>
+                            {selected}
+                          </option>
+                        )}
+                        {options.map((option) => (
+                          <option value={option.code} selected={option.code === selected}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
-                    <td class={sent ? 'sent' : 'sent missing'}>
-                      {sent ? <code>{sent}</code> : t.t('settings.languages.notMapped')}
-                    </td>
+                    {props.reviewAvailable && (
+                      <td class="review">
+                        <label class="inline">
+                          <input
+                            type="checkbox"
+                            name="review"
+                            value={code}
+                            checked={account.reviewLanguages.includes(code)}
+                            aria-label={`${t.t('settings.languages.review')}: ${languageName(code, t.locale)}`}
+                          />
+                          <span class="review-label">{t.t('settings.languages.review')}</span>
+                        </label>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          <datalist id="supertext-codes">
-            {SUPERTEXT_TARGETS.map((code) => (
-              <option value={code} />
-            ))}
-          </datalist>
+          {props.reviewAvailable && <p class="help">{t.t('settings.languages.reviewHint')}</p>}
         </section>
 
         <section class="card">

@@ -175,6 +175,9 @@ export function TranslatePage(props: TranslatePageProps) {
         </form>
       )}
 
+      {account.appTrigger && targets.length > 0 && rows && rows.length > 0 && <ExportCard ctx={ctx} account={account} />}
+      {targets.length > 0 && <ImportCard ctx={ctx} />}
+
       <section id="job-panel" data-job={props.job?.status === 'running' ? props.job.id : undefined}>
         {props.job && <JobPanel t={t} job={props.job} dc={account.dc} />}
       </section>
@@ -211,5 +214,76 @@ function NoLanguages(props: { ctx: PageContext }) {
         {after}
       </p>
     </Notice>
+  );
+}
+
+/** "Export for translation": the campaign chosen in the list above, as XLIFF or HTML (public/app.js downloads it). */
+function ExportCard(props: { ctx: PageContext; account: Account }) {
+  const { t } = props.ctx;
+  return (
+    <section id="export-card" class="card" data-select-one={t.t('files.export.selectOne')}>
+      <h2>{t.t('files.export.heading')}</h2>
+      <p class="muted">{t.t('files.export.text')}</p>
+      <fieldset class="plain">
+        <legend>{t.t('files.format')}</legend>
+        <label class="inline">
+          <input type="radio" name="file-format" value="xliff" checked />
+          {t.t('files.format.xliff')}
+        </label>
+        <label class="inline">
+          <input type="radio" name="file-format" value="html" />
+          {t.t('files.format.html')}
+        </label>
+      </fieldset>
+      <fieldset class="plain">
+        <legend>{t.t('files.languages')}</legend>
+        <div class="languages">
+          {props.account.targets.map((code) => (
+            <label class="language">
+              <input type="checkbox" name="export-language" value={code} checked />
+              <span>{languageName(code, t.locale)}</span>
+              {/* Unmapped languages don't block an export: the file names the Mailchimp code. */}
+              <code>{resolvedTarget(code, props.account.languageCodes) ?? code.replace(/_/g, '-')}</code>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div class="actions">
+        <button type="button" class="primary" id="export-button">
+          {t.t('files.download')}
+        </button>
+        <span id="export-message" class="muted" role="status"></span>
+      </div>
+    </section>
+  );
+}
+
+/** "Import translation": upload a translated file; the summary comes back as HTML. */
+function ImportCard(props: { ctx: PageContext }) {
+  const { t } = props.ctx;
+  return (
+    <form id="import-form" class="card" enctype="multipart/form-data" data-too-large={t.t('error.fileTooLarge')} data-importing={t.t('files.importing')}>
+      <h2>{t.t('files.import.heading')}</h2>
+      <p class="muted">{t.t('files.import.text')}</p>
+      <label class="field">
+        <span>{t.t('files.file')}</span>
+        <input type="file" name="file" accept=".xlf,.xliff,.html,.htm" required />
+      </label>
+      <label class="inline">
+        <input type="checkbox" name="includeChanged" value="1" />
+        {t.t('files.includeChanged')}
+      </label>
+      <label class="inline">
+        <input type="checkbox" name="overwrite" value="1" />
+        {t.t('translate.overwrite')}
+      </label>
+      <div class="actions">
+        <button type="submit" class="primary" id="import-button">
+          {t.t('files.import.submit')}
+        </button>
+        <span id="import-message" class="muted" role="status"></span>
+      </div>
+      <div id="import-result"></div>
+    </form>
   );
 }

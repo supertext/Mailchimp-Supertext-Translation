@@ -98,6 +98,104 @@
   }
   if (panel && panel.getAttribute('data-job')) poll(panel.getAttribute('data-job'));
 
+  // --- Translation files: export for translation, import translation ---------
+  var exportCard = document.getElementById('export-card');
+  var translateForm = document.getElementById('translate-form');
+  if (exportCard && translateForm) {
+    var exportButton = document.getElementById('export-button');
+    var exportMessage = document.getElementById('export-message');
+    exportButton.addEventListener('click', function () {
+      var campaign = checked(translateForm, 'campaign')[0];
+      if (!campaign) {
+        exportMessage.textContent = exportCard.getAttribute('data-select-one');
+        return;
+      }
+      var formatInput = exportCard.querySelector('input[name="file-format"]:checked');
+      exportMessage.textContent = '';
+      exportButton.disabled = true;
+      fetch('/api/files/export', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'Accept-Language': locale },
+        body: JSON.stringify({
+          campaignId: campaign,
+          languages: checked(exportCard, 'export-language'),
+          format: formatInput ? formatInput.value : 'xliff',
+        }),
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            return response.json().then(function (json) {
+              exportMessage.textContent = json.text || (json.error && json.error.message) || 'Error';
+            });
+          }
+          var match = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') || '');
+          return response.blob().then(function (blob) {
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = match ? match[1] : 'mailchimp-supertext.xlf';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(function () {
+              URL.revokeObjectURL(url);
+            }, 10000);
+          });
+        })
+        .catch(function (error) {
+          exportMessage.textContent = String(error);
+        })
+        .then(function () {
+          exportButton.disabled = false;
+        });
+    });
+  }
+
+  var importForm = document.getElementById('import-form');
+  if (importForm) {
+    var importButton = document.getElementById('import-button');
+    var importMessage = document.getElementById('import-message');
+    var importResult = document.getElementById('import-result');
+    importForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      importResult.innerHTML = '';
+      var data = new FormData(importForm);
+      var file = data.get('file');
+      if (file && file.size > 10 * 1024 * 1024) {
+        importMessage.textContent = importForm.getAttribute('data-too-large');
+        return;
+      }
+      var label = importButton.textContent;
+      importButton.disabled = true;
+      importButton.textContent = importForm.getAttribute('data-importing');
+      importMessage.textContent = '';
+      fetch('/api/files/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': csrf, 'Accept-Language': locale },
+        body: data,
+      })
+        .then(function (response) {
+          return response.json().then(function (json) {
+            if (!response.ok) {
+              importMessage.textContent = json.text || (json.error && json.error.message) || 'Error';
+              return;
+            }
+            // Server-rendered (escaped) summary.
+            importResult.innerHTML = json.html || '';
+          });
+        })
+        .catch(function (error) {
+          importMessage.textContent = String(error);
+        })
+        .then(function () {
+          importButton.disabled = false;
+          importButton.textContent = label;
+        });
+    });
+  }
+
   // --- Settings page --------------------------------------------------------
   var test = document.getElementById('test-button');
   if (test) {

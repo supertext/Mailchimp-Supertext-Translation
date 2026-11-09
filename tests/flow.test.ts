@@ -244,19 +244,77 @@ describe('translating from the app', () => {
   it('sends nothing for a language without a Supertext code and goes on with the others', async () => {
     const env = setup();
     await env.connect();
-    // "fr-Latn" isn't a Supertext code: refused when saving, so French has no code ("fr" alone isn't one either).
-    await env.saveSettings([...STANDARD_SETTINGS.filter(([name]) => name !== 'code:fr'), ['code:fr', 'fr-Latn']]);
+    // Norwegian ("no") has no exact match and no default (Supertext's code is nb), so it needs a mapping.
+    await env.saveSettings([...STANDARD_SETTINGS, ['target', 'no']]);
     const settings = await (await env.request('/settings')).text();
-    expect(settings).toContain('These languages have no Supertext code yet');
-    const { id } = await (await env.api('POST', '/api/jobs', { campaignId: 'c-autumn', languages: ['de', 'fr'] })).json();
+    expect(settings).toContain('These languages have no Supertext language yet');
+    expect(settings).toMatch(/<select name="code:no"[^>]*><option value="" selected="">— choose —<\/option>/);
+    const { id } = await (await env.api('POST', '/api/jobs', { campaignId: 'c-autumn', languages: ['de', 'no'] })).json();
     await env.settle();
     const job = (await env.store.getJob(ACCOUNT_ID, id))!;
     expect(job.status).toBe('done');
     expect(job.items.map((item) => [item.language, item.state, item.error?.code])).toEqual([
       ['de', 'created', undefined],
-      ['fr', 'failed', 'unsupportedLanguage'],
+      ['no', 'failed', 'unsupportedLanguage'],
     ]);
     expect(env.supertext.documents.map((d) => d.target)).toEqual(['de-CH']);
+  });
+
+  it('sends languages with Translation review through the review service and the others directly', async () => {
+    const env = setup();
+    await env.connect();
+    await env.saveSettings([...STANDARD_SETTINGS, ['review', 'de']]);
+    expect((await env.store.getAccount(ACCOUNT_ID))!.reviewLanguages).toEqual(['de']);
+    const settings = await (await env.request('/settings')).text();
+    expect(settings).toContain('Translation review');
+    expect(settings).toMatch(/<input type="checkbox" name="review" value="de" checked=""/);
+    expect(settings).toMatch(/<input type="checkbox" name="review" value="fr"(?! checked)/);
+    const { id } = await (await env.api('POST', '/api/jobs', { campaignId: 'c-autumn', languages: ['de', 'fr'] })).json();
+    await env.settle();
+    expect((await env.store.getJob(ACCOUNT_ID, id))!.items.map((item) => [item.language, item.state])).toEqual([
+      ['de', 'created'],
+      ['fr', 'created'],
+    ]);
+    const translate = env.supertextRequests.filter((call) => /\/translate\//.test(call));
+    const review = translate.filter((call) => call.includes('://review.test/v1/'));
+    const direct = translate.filter((call) => call.includes('://supertext.test/v1/'));
+    // de: upload, status, download and delete all at the review service; fr directly at Supertext.
+    for (const calls of [review, direct]) {
+      for (const step of [/^POST .*\/translate\/ai\/file$/, /^GET .*\/status$/, /^GET .*\/translation$/, /^DELETE /]) {
+        expect(calls.some((call) => step.test(call))).toBe(true);
+      }
+    }
+    expect(env.supertext.documents.map((d) => d.target)).toEqual(['de-CH', 'fr-CH']);
+    expect(review.length + direct.length).toBe(translate.length);
+    // The API key check never goes to the review service.
+    expect(env.supertextRequests.filter((call) => call.includes('/features')).every((call) => call.includes('supertext.test'))).toBe(true);
+  });
+
+  it("hides Translation review and sends everything directly when SUPERTEXT_REVIEW_URL is ''", async () => {
+    const env = setup({ SUPERTEXT_REVIEW_URL: '' });
+    await env.connect();
+    await env.saveSettings([...STANDARD_SETTINGS, ['review', 'de']]);
+    expect(await (await env.request('/settings')).text()).not.toContain('name="review"');
+    await env.api('POST', '/api/jobs', { campaignId: 'c-autumn', languages: ['de'] });
+    await env.settle();
+    expect(env.supertextRequests.length).toBeGreaterThan(0);
+    expect(env.supertextRequests.every((call) => call.includes('://supertext.test/'))).toBe(true);
+  });
+
+  it('uses the SDK default for a language nobody mapped and preselects it', async () => {
+    const env = setup();
+    await env.connect();
+    await env.saveSettings([...STANDARD_SETTINGS.filter(([name]) => name !== 'code:fr')]);
+    const settings = await (await env.request('/settings')).text();
+    expect(settings).not.toContain('These languages have no Supertext language yet');
+    // Saved value, suggestion, exact match.
+    expect(settings).toMatch(/<select name="code:de"[^>]*>(?:(?!<\/select>).)*<option value="de-CH" selected="">/s);
+    expect(settings).toMatch(/<select name="code:fr"[^>]*>(?:(?!<\/select>).)*<option value="fr-FR" selected="">/s);
+    expect(settings).toMatch(/<select name="code:es"[^>]*>(?:(?!<\/select>).)*<option value="es" selected="">/s);
+    const { id } = await (await env.api('POST', '/api/jobs', { campaignId: 'c-autumn', languages: ['de', 'fr'] })).json();
+    await env.settle();
+    expect(env.supertext.documents.map((d) => d.target).sort()).toEqual(['de-CH', 'fr-FR']);
+    expect((await env.store.getJob(ACCOUNT_ID, id))!.status).toBe('done');
   });
 
   it('translates a language whose Mailchimp code is a Supertext code as it is, and sends no politeness it lacks', async () => {

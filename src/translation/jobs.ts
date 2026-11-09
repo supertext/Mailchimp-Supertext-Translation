@@ -1,5 +1,5 @@
 import { errorInfo, LocalizedError, type ErrorInfo } from '../i18n/error.js';
-import { MailchimpClient, type Campaign } from '../mailchimp/client.js';
+import { MailchimpClient, type Campaign, type CampaignContent } from '../mailchimp/client.js';
 import { fromSdk, type SupertextClient } from '../supertext/client.js';
 import { newJobId, type Account, type Job, type JobItem, type Store } from '../store/store.js';
 import { supertextSource, supertextTarget, supportsPoliteness } from './languages.js';
@@ -15,7 +15,7 @@ import { translateCampaign } from './translate.js';
 export interface JobDeps {
   store: Store;
   mailchimp: (account: Account) => MailchimpClient;
-  supertext: (account: Account) => Pick<SupertextClient, 'translateSegments'>;
+  supertext: (account: Account) => Pick<SupertextClient, 'translateSegments' | 'forReview'>;
   /** Supertext rejected the key (HTTP 401/403) during a translation: the Commando Center hears of it once. */
   onAuthenticationFailed?: (account: Account, httpStatus: number) => void;
 }
@@ -91,22 +91,10 @@ export async function runJob(deps: JobDeps, job: Job, folderId?: string): Promis
   const mailchimp = deps.mailchimp(account);
   const supertext = deps.supertext(account);
 
-  const source = await mailchimp.campaign(job.campaignId);
-  if (!source) throw new LocalizedError('The campaign no longer exists in Mailchimp.', 'campaignMissing');
-  job.campaignTitle = source.settings.title || source.settings.subject_line || source.id;
-  await store.saveJob(job);
-  if ((await store.translationTargets(account.accountId)).has(source.id)) {
-    throw new LocalizedError('This campaign is a translation made by Supertext.', 'isTranslation');
-  }
-  if (source.type !== 'regular' && source.type !== 'plaintext') {
-    throw new LocalizedError('Only regular and plain-text campaigns can be translated.', 'campaignType', {
-      type: source.type,
-    });
-  }
-  const content = await mailchimp.content(source.id);
-  if (source.type === 'regular' && !content.html) {
-    throw new LocalizedError('Mailchimp returned no HTML for this campaign.', 'noContent');
-  }
+  const { source, content } = await loadCampaign(store, account, mailchimp, job.campaignId, async (title) => {
+    job.campaignTitle = title;
+    await store.saveJob(job);
+  });
 
   // The campaigns' language, as Supertext knows it (the same for every target).
   let sourceLanguage: string;
@@ -131,13 +119,11 @@ export async function runJob(deps: JobDeps, job: Job, folderId?: string): Promis
       } catch (error) {
         throw fromSdk(error); // unsupportedLanguage: nothing is sent for this language
       }
-      const existingId = drafts.get(language);
-      let target: Campaign | undefined = existingId ? await mailchimp.campaign(existingId) : undefined;
-      // A draft that was sent (or scheduled) is left alone: a new draft is made.
-      if (target && target.status !== 'save') target = undefined;
+      const target = await currentDraft(mailchimp, drafts, language);
       const result = await translateCampaign({
         mailchimp,
-        supertext,
+        // Languages with Translation review on go through Supertext's review service.
+        supertext: supertext.forReview(account.reviewLanguages.includes(language)),
         source,
         content,
         target,
@@ -150,15 +136,7 @@ export async function runJob(deps: JobDeps, job: Job, folderId?: string): Promis
         folderId: targetFolder,
       });
       Object.assign(item, result);
-      if (result.targetId && result.state !== 'kept') {
-        await store.saveTranslation(account.accountId, {
-          sourceId: source.id,
-          language,
-          targetId: result.targetId,
-          webId: result.webId,
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      await rememberDraft(store, account, source, language, result);
     } catch (error) {
       const info: ErrorInfo = errorInfo(error);
       item.state = 'failed';
@@ -176,25 +154,93 @@ export async function runJob(deps: JobDeps, job: Job, folderId?: string): Promis
     await store.saveJob(job);
   }
 
-  // The original goes only to subscribers without a translation, if the account wants that.
-  if (account.limitOriginal && (source.status === 'save' || source.status === 'paused')) {
-    const languages = (await store.translations(account.accountId, source.id)).map((t) => t.language).sort();
-    const segment = originalSegment(source.recipients?.segment_opts, languages);
-    if (segment && languages.length > 0) {
-      try {
-        await mailchimp.updateCampaign(source.id, {
-          recipients: { list_id: source.recipients?.list_id, segment_opts: segment },
-        });
-        job.originalLimited = true;
-      } catch (error) {
-        console.warn('Supertext: could not limit the original campaign', error);
-        job.originalLimited = false;
-      }
-    } else if (languages.length > 0) {
-      job.originalLimited = false;
-    }
-  }
+  const limited = await limitOriginal(store, account, mailchimp, source);
+  if (limited !== undefined) job.originalLimited = limited;
   return finish(store, job, 'done');
+}
+
+/**
+ * The campaign to translate and its content, checked: it exists, isn't a
+ * translation itself, is regular or plain text and has content.
+ */
+export async function loadCampaign(
+  store: Store,
+  account: Account,
+  mailchimp: Pick<MailchimpClient, 'campaign' | 'content'>,
+  campaignId: string,
+  onTitle?: (title: string) => Promise<void>,
+): Promise<{ source: Campaign; content: CampaignContent }> {
+  const source = await mailchimp.campaign(campaignId);
+  if (!source) throw new LocalizedError('The campaign no longer exists in Mailchimp.', 'campaignMissing');
+  await onTitle?.(source.settings.title || source.settings.subject_line || source.id);
+  if ((await store.translationTargets(account.accountId)).has(source.id)) {
+    throw new LocalizedError('This campaign is a translation made by Supertext.', 'isTranslation');
+  }
+  if (source.type !== 'regular' && source.type !== 'plaintext') {
+    throw new LocalizedError('Only regular and plain-text campaigns can be translated.', 'campaignType', {
+      type: source.type,
+    });
+  }
+  const content = await mailchimp.content(source.id);
+  if (source.type === 'regular' && !content.html) {
+    throw new LocalizedError('Mailchimp returned no HTML for this campaign.', 'noContent');
+  }
+  return { source, content };
+}
+
+/** The language's existing draft, if it is still a draft (a sent or scheduled one is left alone: a new draft is made). */
+export async function currentDraft(
+  mailchimp: Pick<MailchimpClient, 'campaign'>,
+  drafts: Map<string, string>,
+  language: string,
+): Promise<Campaign | undefined> {
+  const existingId = drafts.get(language);
+  const target = existingId ? await mailchimp.campaign(existingId) : undefined;
+  return target && target.status === 'save' ? target : undefined;
+}
+
+/** Records a draft that was created or updated. */
+export async function rememberDraft(
+  store: Store,
+  account: Account,
+  source: Campaign,
+  language: string,
+  result: Pick<JobItem, 'state' | 'targetId' | 'webId'>,
+): Promise<void> {
+  if (!result.targetId || result.state === 'kept') return;
+  await store.saveTranslation(account.accountId, {
+    sourceId: source.id,
+    language,
+    targetId: result.targetId,
+    webId: result.webId,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * The original goes only to subscribers without a translation, if the account
+ * wants that. True/false when it was tried, undefined when not applicable.
+ */
+export async function limitOriginal(
+  store: Store,
+  account: Account,
+  mailchimp: Pick<MailchimpClient, 'updateCampaign'>,
+  source: Campaign,
+): Promise<boolean | undefined> {
+  if (!account.limitOriginal || (source.status !== 'save' && source.status !== 'paused')) return undefined;
+  const languages = (await store.translations(account.accountId, source.id)).map((t) => t.language).sort();
+  if (languages.length === 0) return undefined;
+  const segment = originalSegment(source.recipients?.segment_opts, languages);
+  if (!segment) return false;
+  try {
+    await mailchimp.updateCampaign(source.id, {
+      recipients: { list_id: source.recipients?.list_id, segment_opts: segment },
+    });
+    return true;
+  } catch (error) {
+    console.warn('Supertext: could not limit the original campaign', error);
+    return false;
+  }
 }
 
 async function finish(store: Store, job: Job, status: Job['status'], error?: ErrorInfo): Promise<Job> {
