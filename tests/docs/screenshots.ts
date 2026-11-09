@@ -14,6 +14,7 @@ import type { AddressInfo } from 'node:net';
 import { chromium, type Locator, type Page } from 'playwright';
 import { createApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
+import { translator } from '../../src/i18n/index.js';
 import { MemoryStore } from '../../src/store/store.js';
 import { createMailchimpStandin } from '../standin/mailchimp.js';
 import { createSupertextStandin } from '../standin/supertext.js';
@@ -86,6 +87,14 @@ async function main() {
       if (i > 2) (row as HTMLElement).style.display = 'none';
     });
   });
+  // The key check's time changes with every run: show a fixed one (formatted as the page
+  // does), so the image only changes when the UI does.
+  const checkedAt = translator('en').t('settings.keyCheck.at', {
+    time: new Date('2026-10-06T09:00:00Z').toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }),
+  });
+  await page.locator('#key-check .muted').evaluate((element, text) => {
+    element.textContent = text;
+  }, checkedAt);
   await shot('settings', page.locator('main'));
 
   // Translate page: the autumn newsletter, German and French.
