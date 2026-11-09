@@ -112,7 +112,7 @@ check('settings: the server key is used (none typed in)', (await page.locator('i
 await page.selectOption('select[name="sourceLanguage"]', 'en');
 for (const [code, supertext] of Object.entries(TARGETS)) {
   await page.check(`#t-${code}`);
-  await page.fill(`input[name="code:${code}"]`, supertext);
+  await page.selectOption(`select[name="code:${code}"]`, supertext);
 }
 await page.check('input[name="appTrigger"]');
 await Promise.all([page.waitForURL(/saved=1/), page.click('button.primary')]);
