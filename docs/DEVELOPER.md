@@ -153,7 +153,7 @@ Version reports, the automatic API key check and the key status go to the Supert
 
 ## Local development
 
-Requirements: Node.js 22.12+ (CI runs the tests and the smoke test on Node 22, 24 and 26; the Docker image uses Node 22). No Mailchimp account needed for most work: the stand-ins answer like Mailchimp (OAuth and the API calls above) and Supertext for a sample account (`tests/standin/seed.ts`: a Swiss chocolate shop with a template campaign, an HTML campaign in a folder of its own with an interest segment, and a sent campaign; `samples.json` holds human translations of their texts into German, French and Italian).
+Requirements: Node.js 22.12+ (CI runs the tests and the smoke test on Node 22, 24 and 26; the Docker image uses Node 26). No Mailchimp account needed for most work: the stand-ins answer like Mailchimp (OAuth and the API calls above) and Supertext for a sample account (`tests/standin/seed.ts`: a Swiss chocolate shop with a template campaign, an HTML campaign in a folder of its own with an interest segment, and a sent campaign; `samples.json` holds human translations of their texts into German, French and Italian).
 
 ```bash
 npm install

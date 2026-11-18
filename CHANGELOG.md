@@ -4,6 +4,7 @@ All notable changes to Supertext Translation for Mailchimp.
 
 ## Unreleased
 
+- Changed: the Docker image (Railway) runs on Node.js 26, the current LTS (was Node 22); running the app still needs Node.js 22.12 or later. Dependencies updated (Hono 4.13.19, @hono/node-server 2.1.9).
 - Docs: demo movie in the README (`docs/images/demo.gif`, recorded from the app against the stand-ins with `npm run docs:movie`; the MP4 version, not committed, is narrated with the Piper voice “alba”) and an install and configuration movie (`npm run docs:movie:install`: connecting Mailchimp, the API key and its check, the languages, the Supertext folders; narrated MP4, not committed).
 - Added: the Supertext support form is linked in the README, the user guide and GitHub's "New issue" page.
 - **Added: Translation review** per language (Settings → Languages, a checkbox next to the *Supertext code*): translations into a language with *Translation review* ticked go through Supertext's review service (Supertext Localization Review), where your colleagues or Supertext linguists correct them; corrections come back into the language's draft with the next translation, and texts translated before keep their (reviewed) wording. Same API key, billing, languages and messages; all other languages keep going directly to Supertext. Off for every language by default (existing accounts too). New server setting `SUPERTEXT_REVIEW_URL` (defaults to Supertext's review service; empty turns review off for every account and hides the checkbox). All four interface languages.

@@ -1,5 +1,5 @@
 # Supertext Translation for Mailchimp: the app (runs on Railway).
-FROM node:22-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 
