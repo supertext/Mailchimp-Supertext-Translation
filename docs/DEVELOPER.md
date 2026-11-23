@@ -233,7 +233,7 @@ What runs:
    - the text is in the target language (common-word count), `de-CH` without "ß";
    - no error in the app's job panel or form;
    - translating the first campaign again keeps the drafts (*0 created, 0 updated, 3 kept*), and with *Update existing drafts* updates the same drafts in place (*3 updated*, same campaign IDs, no new campaigns), checked again.
-4. The docs screenshots (`npm run docs:screenshots`) against the stand-in Mailchimp and the stand-in Supertext API, as described under *Screenshots*. If the images differ from `docs/images/`, they are uploaded, and on `main` a second job opens or updates the pull request "Docs: regenerate screenshots" from the branch `automation/docs-screenshots`. The key check's time on the settings image is fixed in the script, so the images only change when the UI does.
+4. The docs screenshots (`npm run docs:screenshots`) against the stand-in Mailchimp and the stand-in Supertext API, as described under *Screenshots*. If the images differ from `docs/images/` and the screenshot step succeeded, they are uploaded, and on `main` a second job commits them straight to `main` ("Docs: regenerate screenshots"). There is no pull request to review, and the push, made with the workflow's own token, starts no other workflow. The key check's time on the settings image is fixed in the script, so the images only change when the UI does.
 
 Triggers: weekly (Mondays 06:07 UTC), pushes to `main` that change the app, its tests or the workflow, pull requests that change `tests/e2e/` or the workflow, and by hand (*Actions → E2E → Run workflow*).
 
