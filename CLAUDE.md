@@ -79,3 +79,7 @@ Lessons from the live API, apply them here: header `Authorization: Supertext-Aut
 - New settings go in `src/store/store.ts` (`Account`, stored as JSON), `src/views/settings.tsx`, the form handler in `src/app.ts` **and** the settings table in `docs/INSTALLATION.md`.
 - Every page and API call needs the session cookie; POSTs also the CSRF token (`src/auth/session.ts`).
 - Hosting: Railway service *Mailchimp* in *supertext-cms-demos*, building the `Dockerfile` (set on the service; Railway ignores `railway.json`), health check `/health`, its own database `mailchimp_supertext` on the shared Postgres, one instance (the poller runs in the web process). Don't export-ignore anything the Dockerfile copies.
+
+## Live E2E runs share one API key (always)
+
+Every push to `main` that touches the plugin, the demo or the tests starts the live E2E run, and all Supertext plugin repos share one Supertext API key, which is rate-limited per second. When the same kind of change goes to several repos, push them one repo at a time, at least 3 minutes apart (a loop with `sleep 180`), never in parallel. Docs-only changes (`docs/`, `README.md`, `CHANGELOG.md`, `CLAUDE.md`) don't start it and can go together. A live run that failed with `RATE_LIMIT_EXCEEDED` collided with another repo's run, it isn't a bug: rerun it on its own.
