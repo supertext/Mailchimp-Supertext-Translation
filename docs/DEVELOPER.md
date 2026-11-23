@@ -215,7 +215,7 @@ It needs `ffmpeg` and writes 1280×720 at 30 fps. The GIF (800 px, 12 fps, keep 
 
 ### Install movie
 
-`tests/docs/movie-install.ts` records the install and configuration movie with the same kit and voice (MP4 only, no GIF). The app is hosted, so there is no install command: it shows the connect page and *Connect Mailchimp* (the stand-in approves at once; Mailchimp's login and consent are only told in one spoken line, not shown), then the settings: where the API key comes from, the fake key `st-demo-0000-0000-0000` typed into *API key*, the language of the campaigns, German ticked with the *Supertext code* Swiss High German (de-CH), *Translation review* left off, the *Mailchimp folders* trigger (*Supertext → German*) in one line, *Save* and the API key check, and finally the *Translate* page.
+`tests/docs/movie-install.ts` records the install and configuration movie with the same kit and voice (MP4 only, no GIF). The app is hosted, so there is no install command: it shows the connect page and *Connect Mailchimp* (the stand-in approves at once; Mailchimp's login and consent are only told in one spoken line, not shown), then the settings: where the API key comes from, the fake key `st-demo-0000-0000-0000` typed into *API key*, the language of the campaigns, German ticked with the *Supertext code* German (Switzerland) (de-CH), *Translation review* left off, the *Mailchimp folders* trigger (*Supertext → German*) in one line, *Save* and the API key check, and finally the *Translate* page.
 
 ## End-to-end tests
 

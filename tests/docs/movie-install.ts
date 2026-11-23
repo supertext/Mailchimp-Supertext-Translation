@@ -80,8 +80,8 @@ async function main() {
   });
   const german = page.locator('#t-de');
   const code = page.locator('select[name="code:de"]');
-  await kit.say('Tick the languages to translate into. For German, the Supertext code says which German: here, Swiss High German.', {
-    caption: 'Tick <b>German</b>: Swiss High German (de-CH)',
+  await kit.say('Tick the languages to translate into. For German, the Supertext code says which German: here, German (Switzerland).', {
+    caption: 'Tick <b>German</b>: German (Switzerland) (de-CH)',
     during: async () => {
       await center(german);
       await kit.click(german);

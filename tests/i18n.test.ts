@@ -111,7 +111,7 @@ describe('languages', () => {
   it('offers Supertext targets as "Name (code)" in the interface language', () => {
     const options = targetOptions('de');
     expect(options.map((option) => option.code).sort()).toEqual([...SUPERTEXT_TARGETS].sort());
-    expect(options.find((option) => option.code === 'de-CH')?.label).toBe('Schweizer Hochdeutsch (de-CH)');
+    expect(options.find((option) => option.code === 'de-CH')?.label).toBe('Deutsch (Schweiz) (de-CH)');
     expect(options.find((option) => option.code === 'gsw-u-sd-chzh')?.label).toMatch(/\(gsw-u-sd-chzh\)$/);
   });
 

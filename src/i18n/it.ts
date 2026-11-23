@@ -130,7 +130,7 @@ export const it: Messages = {
   'settings.languages.auto': 'Lasciare che Supertext la riconosca',
   'settings.languages.targets': 'Traduci in',
   'settings.languages.code': "Codice Supertext",
-  'settings.languages.codeHint': "Scelga per ogni lingua di Mailchimp la lingua Supertext, per esempio alto tedesco svizzero (de-CH) invece di tedesco (Germania) (de-DE). Ogni elenco propone prima il suggerimento di Supertext: lo stesso codice se quello di Mailchimp lo è (es, nl), altrimenti il valore predefinito ovvio (de-DE, en-US, fr-FR, it-IT, pt-PT, zh-Hans, sr-Latn). Una lingua il cui elenco mostra «— scegliere —» viene tradotta solo dopo che ne avrà scelta una.",
+  'settings.languages.codeHint': "Scelga per ogni lingua di Mailchimp la lingua Supertext, per esempio tedesco (Svizzera) (de-CH) invece di tedesco (Germania) (de-DE). Ogni elenco propone prima il suggerimento di Supertext: lo stesso codice se quello di Mailchimp lo è (es, nl), altrimenti il valore predefinito ovvio (de-DE, en-US, fr-FR, it-IT, pt-PT, zh-Hans, sr-Latn). Una lingua il cui elenco mostra «— scegliere —» viene tradotta solo dopo che ne avrà scelta una.",
   'settings.start.heading': 'Avvia le traduzioni da',
   'settings.start.folders': 'Le cartelle di Mailchimp',
   'settings.start.foldersHint':

@@ -26,7 +26,7 @@ export const isLanguage = (code: string): boolean => LANGUAGE_CODES.includes(cod
 /** The language's name in the given interface language ("de" in French → "allemand"). */
 export function languageName(code: string, uiLocale: string): string {
   try {
-    const name = new Intl.DisplayNames([uiLocale], { type: 'language' }).of(code === 'no' ? 'nb' : code);
+    const name = new Intl.DisplayNames([uiLocale], { type: 'language', languageDisplay: 'standard' }).of(code === 'no' ? 'nb' : code);
     if (name && name !== code) return name.charAt(0).toLocaleUpperCase(uiLocale) + name.slice(1);
   } catch {
     // fall through
@@ -43,11 +43,11 @@ export const supertextCodeOf = (code: string): string | null => Languages.matchT
 /** What the combo box preselects for a Mailchimp language without a saved code: exact match, else the SDK default, else null. */
 export const suggestedTarget = (language: string): string | null => Languages.suggestTarget(language);
 
-/** A Supertext target's name in the interface language ("de-CH" in German → "Schweizer Hochdeutsch"); the SDK's English name where Intl has none. */
+/** A Supertext target's name in the interface language ("de-CH" in German → "Deutsch (Schweiz)"); the SDK's English name where Intl has none. */
 export function targetName(code: string, englishName: string, uiLocale: string): string {
   if (!code.includes('-u-')) {
     try {
-      const name = new Intl.DisplayNames([uiLocale], { type: 'language' }).of(code);
+      const name = new Intl.DisplayNames([uiLocale], { type: 'language', languageDisplay: 'standard' }).of(code);
       if (name && name !== code) return name.charAt(0).toLocaleUpperCase(uiLocale) + name.slice(1);
     } catch {
       // fall through
