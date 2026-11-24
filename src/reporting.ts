@@ -16,6 +16,7 @@ import {
   reportsEnabled,
   type FetchLike,
   type KeyChecker,
+  type LanguageMapping,
   type ReporterOptions,
   type ReporterResult,
 } from 'supertext-plugin-health';
@@ -79,7 +80,7 @@ export class Reporting {
     return account.apiKey || this.deps.config.supertextApiKey;
   }
 
-  reporter(account: Account): InstallationReporter {
+  reporter(account: Account, languages?: LanguageMapping[]): InstallationReporter {
     const { config } = this.deps;
     return new InstallationReporter({
       enabled: this.enabled(account),
@@ -90,6 +91,7 @@ export class Reporting {
       sdkVersion: SDK_VERSION,
       callbackUrl: null,
       keyChecker: this.keyChecker(),
+      ...(languages ? { languages: () => languages } : {}),
       ...(config.reportUrl ? { reportUrl: config.reportUrl } : {}),
       ...(this.deps.fetch ? { fetch: this.deps.fetch as FetchLike } : {}),
       ...this.deps.reporterOverrides,
@@ -135,6 +137,33 @@ export class Reporting {
         return result as ReportResult;
       } catch (error) {
         console.warn(`Supertext: version report skipped (${error instanceof Error ? error.message : String(error)})`);
+        return null;
+      }
+    });
+    const settled = task.catch(() => undefined);
+    this.queues.set(account.accountId, settled);
+    void settled.then(() => {
+      if (this.queues.get(account.accountId) === settled) this.queues.delete(account.accountId);
+    });
+    return task;
+  }
+
+  /**
+   * "Send configuration to Supertext" (Settings): the account's language mapping in one `extensions`
+   * report (a hosted app has no plugins of its own to list, so the list is empty), sent now (also
+   * within the hour after a failed report). Null while version reports are off. Never throws.
+   */
+  sendConfiguration(account: Account, languages: LanguageMapping[]): Promise<ReportResult | null> {
+    const previous = this.queues.get(account.accountId) ?? Promise.resolve();
+    const task = previous.then(async () => {
+      try {
+        const fresh = (await this.deps.store.getAccount(account.accountId)) ?? account;
+        if (!this.enabled(fresh)) return null;
+        const result = await this.reporter(fresh, languages).sendExtensions(fresh.reporter ?? null, []);
+        await this.deps.store.saveReporterState(account.accountId, result.state);
+        return result as ReportResult;
+      } catch (error) {
+        console.warn(`Supertext: configuration not sent (${error instanceof Error ? error.message : String(error)})`);
         return null;
       }
     });

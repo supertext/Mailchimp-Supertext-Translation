@@ -63,4 +63,33 @@ describe('reporting glue', () => {
     expect(on.enabled({ versionReports: false })).toBe(false);
     expect(on.fixedByEnvironment).toBe(false);
   });
+
+  it('Send configuration: the language mapping in one extensions report (no plugins), nothing with reports off', async () => {
+    const store = new MemoryStore();
+    const account = defaultAccount('3');
+    await store.saveAccount(account);
+    const reports: Array<Record<string, unknown>> = [];
+    const supertext = createSupertextStandin();
+    const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      if (new URL(request.url).host === 'center.test') {
+        reports.push((await request.json()) as Record<string, unknown>);
+        return new Response('{"ok":true}', { status: 202 });
+      }
+      return supertext.handle(request);
+    }) as typeof fetch;
+    const languages = [
+      { code: 'en', supertext: 'en' },
+      { code: 'de', supertext: 'de-DE' },
+      { code: 'no', supertext: null },
+    ];
+    const reporting = new Reporting({ config, store, fetch: fetchFn });
+    expect(await reporting.sendConfiguration(account, languages)).toMatchObject({ event: 'extensions', sent: true });
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({ event: 'extensions', extensions: [], languages });
+
+    const off = new Reporting({ config: { ...config, versionReports: '0' }, store, fetch: fetchFn });
+    expect(await off.sendConfiguration(account, languages)).toBeNull();
+    expect(reports).toHaveLength(1);
+  });
 });

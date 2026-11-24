@@ -42,7 +42,7 @@ Everyone in your team who connects the same Mailchimp account shares its setting
 
 Enter the API key, choose your languages, check the Supertext language in each one's box and click **Save**. Saving checks the API key automatically (free of charge, nothing is translated) and shows the result under the key: *API key checked: the connection to Supertext works.* means everything is in place. **Test connection** runs the same check again, also for a key you have typed but not saved yet.
 
-<img src="images/settings.png" alt="Supertext settings: the saved API key with links to create a Supertext account and generate the key, the API key check result and Test connection, both saying the connection to Supertext works, the language of the campaigns (English), French, German and Italian ticked with the Supertext languages French (Switzerland) (fr-CH), German (Switzerland) (de-CH) and Italian (Switzerland) (it-CH) chosen in their combo boxes, the unticked Arabic box showing — choose —, Bulgarian preselected as Bulgarian (bg) and Chinese as Chinese (Simplified) (zh-Hans), Translation review ticked for German only, the note on Translation review below the table, Start translations from: Mailchimp folders and The Supertext app, Send the original only to subscribers without a translated language, the form of address, Send version information to Supertext, the connected account and the version 0.1.0" width="720">
+<img src="images/settings.png" alt="Supertext settings: the saved API key with links to create a Supertext account and generate the key, the API key check result and Test connection, both saying the connection to Supertext works, the language of the campaigns (English), French, German and Italian ticked with the Supertext languages French (Switzerland) (fr-CH), German (Switzerland) (de-CH) and Italian (Switzerland) (it-CH) chosen in their combo boxes, the unticked Arabic box showing — choose —, Bulgarian preselected as Bulgarian (bg) and Chinese as Chinese (Simplified) (zh-Hans), Translation review ticked for German only, the note on Translation review below the table, Start translations from: Mailchimp folders and The Supertext app, Send the original only to subscribers without a translated language, the form of address, Send version information to Supertext with the Send configuration to Supertext button, the connected account and the version 0.1.0" width="720">
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -101,6 +101,8 @@ With **Send version information to Supertext** on, the app sends a short report 
 - whether an API key is set and the result of the key check (`ok`, `invalid`, `missing`, `unreachable` or `error`, with the time and Supertext's HTTP status).
 
 No content, no API key and no personal data. Being a hosted app, it has no ping address and sends no callback URL. Turn it off by unticking the setting and saving: then nothing at all is sent. Supertext can turn it off for all accounts on the server with `SUPERTEXT_VERSION_REPORTS=0` (the checkbox then can't be changed). The API key check itself runs either way.
+
+**Send configuration to Supertext** (*Settings → Supertext support*): when you contact Supertext support, this button sends, in one report, the account's languages with the Supertext language each is sent as. Being a hosted app, there are no plugins to list. Nothing else is sent, and nothing at all while version information is off.
 
 ## Who can translate
 

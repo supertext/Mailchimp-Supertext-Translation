@@ -3,8 +3,9 @@ name: E2E
 # The app's Docker image (as Railway builds it) against the REAL Supertext API: language list
 # check and the end-to-end test (tests/e2e). There is no Mailchimp account in CI: the app talks
 # to the stand-in Mailchimp (tests/standin), and the test checks the drafts it received.
-# Then the docs screenshots against the stand-in Mailchimp AND Supertext APIs (tests/docs), so
-# the images don't change with every machine translation. Changed images are committed to main.
+# Then the docs screenshots (tests/docs) against the stand-in Mailchimp and, with the same secret,
+# the real Supertext API, so the guides show real translations (without the secret: the Supertext
+# stand-in). Version reports always go to the stand-in. Changed images are committed to main.
 # See "End-to-end tests" and "Screenshots" in docs/DEVELOPER.md.
 
 on:
@@ -126,12 +127,14 @@ jobs:
         if: steps.key.outputs.present == 'true'
         run: npx tsx tests/e2e/live.ts
 
-      # --- 2. Docs screenshots against the stand-ins ---------------------------------------------
-      # tests/docs/screenshots.ts runs the app and both stand-ins in-process (version reports
-      # go to the stand-in's /report).
-      - name: Screenshots against the stand-in APIs
+      # --- 2. Docs screenshots: stand-in Mailchimp, real Supertext API -------------------------
+      # tests/docs/screenshots.ts runs the app and the stand-ins in-process (version reports
+      # go to the stand-in's /report); with the secret it translates with the real API.
+      - name: Screenshots with the real Supertext API
         id: shots
         if: success() || failure()
+        env:
+          SUPERTEXT_API_KEY: ${{ secrets.SUPERTEXT_API_KEY }}
         run: npm run docs:screenshots
 
       - name: Did the screenshots change?
@@ -187,7 +190,7 @@ jobs:
           name: docs-images
           path: docs/images/
 
-      # Straight to main, no pull request to review: the images come from the stand-in, and a push
+      # Straight to main, no pull request to review: the images come from the app, and a push
       # with the workflow's own token starts no other workflow. See "End-to-end tests" in docs/DEVELOPER.md.
       - name: Commit the images to main
         env:

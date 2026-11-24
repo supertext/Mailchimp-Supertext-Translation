@@ -10,7 +10,7 @@ import { defaultAccount, type Account, type Store } from './store/store.js';
 import { removeFolders, syncFolders } from './translation/folders.js';
 import { exportFile, importFile, refuseLargeUpload } from './translation/files.js';
 import { startJob, type JobDeps } from './translation/jobs.js';
-import { isLanguage, supertextCodeOf } from './translation/languages.js';
+import { isLanguage, resolvedTarget, supertextCodeOf, supertextSource } from './translation/languages.js';
 import { Reporting } from './reporting.js';
 import { ConnectPage } from './views/connect.js';
 import { ImportSummaryPanel } from './views/files.js';
@@ -382,6 +382,7 @@ export function createApp(deps: AppDeps) {
           invalidCodes: c.req.query('invalid') || undefined,
           foldersError: c.req.query('folders') || undefined,
           bothOff: c.req.query('bothOff') === '1',
+          configResult: (['sent', 'off', 'failed'] as const).find((r) => r === c.req.query('config')),
         }),
       ),
     );
@@ -448,6 +449,25 @@ export function createApp(deps: AppDeps) {
       }),
       303,
     );
+  });
+
+  // "Send configuration to Supertext": the account's language mapping, for Supertext support.
+  app.post('/settings/configuration', async (c) => {
+    const session = await current(c);
+    if (!session) return c.redirect('/', 303);
+    const form = await c.req.parseBody();
+    if (!sessions.checkCsrf(session.cookie, String(form.csrf ?? ''))) return c.redirect('/?error=session', 303);
+    const account = session.account;
+    let outcome: 'sent' | 'off' | 'failed' = 'off';
+    if (reporting.enabled(account)) {
+      const languages = [
+        ...(account.sourceLanguage ? [{ code: account.sourceLanguage, supertext: supertextSource(account.sourceLanguage, account.languageCodes) || null }] : []),
+        ...account.targets.map((code) => ({ code, supertext: resolvedTarget(code, account.languageCodes) })),
+      ];
+      const result = await reporting.sendConfiguration(account, languages);
+      outcome = result?.sent ? 'sent' : 'failed';
+    }
+    return c.redirect(appUrl('/settings', { config: outcome }), 303);
   });
 
   return app;

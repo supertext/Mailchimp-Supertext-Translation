@@ -4,6 +4,9 @@ All notable changes to Supertext Translation for Mailchimp.
 
 ## Unreleased
 
+- Added: *Send configuration to Supertext* on the settings page: sends the account's language mapping to Supertext support in one report (Supertext Plugin Health 0.4.0). Nothing is sent while version reports are off.
+- Changed: version reports go to `https://pluginhealth.supertext.com` (Supertext Plugin Health 0.4.0).
+- Changed: the docs screenshots show real Supertext translations: CI takes them with the live API (secret `SUPERTEXT_API_KEY`); the Supertext stand-in translates only without the key. Version reports still go to the stand-in.
 - Changed: language lists name Supertext's languages the way Supertext's own language list does, in the interface language: *German (Switzerland)*, *Deutsch (Schweiz)*, *allemand (Suisse)*, *tedesco (Svizzera)* instead of *Swiss High German*, *Schweizer Hochdeutsch*, *allemand suisse*, *alto tedesco svizzero* (likewise *French (Switzerland)*, *English (United States)* …).
 - Changed: the Docker image (Railway) runs on Node.js 26, the current LTS (was Node 22); running the app still needs Node.js 22.12 or later. Dependencies updated (Hono 4.13.19, @hono/node-server 2.1.9).
 - Docs: demo movie in the README (`docs/images/demo.gif`, recorded from the app against the stand-ins with `npm run docs:movie`; the MP4 version, not committed, is narrated with the Piper voice “alba”) and an install and configuration movie (`npm run docs:movie:install`: connecting Mailchimp, the API key and its check, the languages, the Supertext folders; narrated MP4, not committed).
