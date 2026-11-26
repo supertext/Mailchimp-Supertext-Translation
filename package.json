@@ -1,6 +1,6 @@
 {
   "name": "mailchimp-supertext-translation",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Supertext AI translation for Mailchimp: turn a campaign into one draft per language, started from a Mailchimp folder or from the Supertext app.",
   "license": "MIT",
   "private": true,
