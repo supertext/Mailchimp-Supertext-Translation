@@ -4,6 +4,7 @@ All notable changes to Supertext Translation for Mailchimp.
 
 ## Unreleased
 
+- Added: Indonesian, Romanian, Thai and Vietnamese (`id`, `ro`, `th`, `vi`) can be chosen as Supertext languages, all with formal and informal address (Supertext SDK 0.7.0).
 - Added: *Send configuration to Supertext* on the settings page: sends the account's language mapping to Supertext support in one report (Supertext Plugin Health 0.4.0). Nothing is sent while version reports are off.
 - Changed: version reports go to `https://pluginhealth.supertext.com` (Supertext Plugin Health 0.4.0).
 - Changed: the docs screenshots show real Supertext translations: CI takes them with the live API (secret `SUPERTEXT_API_KEY`); the Supertext stand-in translates only without the key. Version reports still go to the stand-in.
