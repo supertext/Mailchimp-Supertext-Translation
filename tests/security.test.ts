@@ -13,6 +13,8 @@ describe('security headers and cookies', () => {
     }
     expect(csp).not.toContain('unsafe-inline');
     expect(response.headers.get('permissions-policy')).toBe(PERMISSIONS_POLICY);
+    expect(response.headers.get('reporting-endpoints')).toBe('csp="https://pluginhealth.supertext.com/api/v1/csp-report"');
+    expect(csp).toContain('report-to csp');
     expect(response.headers.get('cache-control')).toBe('no-cache, private');
   });
 

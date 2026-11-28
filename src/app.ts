@@ -63,6 +63,9 @@ export function services(deps: AppDeps) {
  * (images also data:, for CSS icons). No inline scripts, no plugins, no other <base>, forms only to
  * the app, and never inside a frame.
  */
+/** Where browsers report what the policy blocked: Supertext Plugin Health. */
+export const CSP_REPORT_URL = 'https://pluginhealth.supertext.com/api/v1/csp-report';
+
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
@@ -74,6 +77,9 @@ export const CONTENT_SECURITY_POLICY = [
   "base-uri 'none'",
   "form-action 'self'",
   "frame-ancestors 'none'",
+  // Violations go to Plugin Health's collector (CSP reports page; its developer guide → CSP reports).
+  `report-uri ${CSP_REPORT_URL}`,
+  'report-to csp',
 ].join('; ');
 export const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
 
@@ -103,6 +109,7 @@ export function createApp(deps: AppDeps) {
   app.use('*', async (c, next) => {
     await next();
     c.header('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+    c.header('Reporting-Endpoints', `csp="${CSP_REPORT_URL}"`);
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     c.header('X-Content-Type-Options', 'nosniff');
     // The app needs no camera, microphone, location or other browser features.

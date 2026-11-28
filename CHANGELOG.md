@@ -6,6 +6,7 @@ All notable changes to Supertext Translation for Mailchimp.
 
 ### Security
 
+- Security: what the Content-Security-Policy blocks in a browser is reported to Supertext Plugin Health (*CSP reports*), so a page broken by the policy shows up the same day.
 - Every cookie (session, OAuth state, interface language) is set and deleted with `HttpOnly` and `SameSite=Lax`; pages send a strict Content-Security-Policy, a `Permissions-Policy`, `Cache-Control: no-cache, private` and, over HTTPS, HSTS; stored secrets only accept full-length authentication tags; the container no longer runs as root. Found by the new security scans (Semgrep and OWASP ZAP, weekly and on every code change).
 - The Supertext API key set on the server (`SUPERTEXT_API_KEY`) is used only for the Mailchimp account named by the new `SUPERTEXT_API_KEY_ACCOUNT` (the demo account). Before, every connected account without its own key translated on it. Without `SUPERTEXT_API_KEY_ACCOUNT` the server's key is used for no account.
 
