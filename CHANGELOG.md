@@ -4,6 +4,10 @@ All notable changes to Supertext Translation for Mailchimp.
 
 ## Unreleased
 
+### Security
+
+- The Supertext API key set on the server (`SUPERTEXT_API_KEY`) is used only for the Mailchimp account named by the new `SUPERTEXT_API_KEY_ACCOUNT` (the demo account). Before, every connected account without its own key translated on it. Without `SUPERTEXT_API_KEY_ACCOUNT` the server's key is used for no account.
+
 ## 0.2.0 — 2026-11-26
 
 - Added: Indonesian, Romanian, Thai and Vietnamese (`id`, `ro`, `th`, `vi`) can be chosen as Supertext languages, all with formal and informal address (Supertext SDK 0.7.0).

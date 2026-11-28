@@ -17,7 +17,7 @@ export interface Account {
   apiEndpoint: string;
   /** OAuth access token (doesn't expire; '' after Mailchimp refused it). */
   accessToken: string;
-  /** The account's own Supertext API key ('' = use SUPERTEXT_API_KEY). */
+  /** The account's own Supertext API key ('' = the server's, if SUPERTEXT_API_KEY_ACCOUNT is this account). */
   apiKey: string;
   tone: Politeness;
   /** Mailchimp code of the campaigns' language ("en"); '' = let Supertext detect it. */

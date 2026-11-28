@@ -99,7 +99,7 @@ The pages follow supertext.com: the deep-green header bar (`#003230`, rounded bo
 
 AI file translation API v1 at `https://api.supertext.com/v1/` (upload an HTML file, poll its status, download the translation, delete the file), handled entirely by the Supertext SDK: the `Supertext-Auth-Key` header (a pasted prefix is stripped), the multipart upload with a file part of type exactly `text/html`, HTTP 429 retries (`Retry-After`, else 1/2/4/8 s with jitter), polling every 2 s with a 3-minute timeout, the delete after every upload, the HTML packing (one `<div data-st-id="N">` per segment) and the language codes. See the SDK's [integration guide](https://github.com/Supertext/Supertext-API-SDK-Guide/blob/main/docs/integration-guide.md) and [API reference](https://github.com/Supertext/Supertext-API-SDK-Guide/blob/main/docs/api-reference.md).
 
-`src/supertext/client.ts` creates one SDK client per account with the key and the base URL (`SUPERTEXT_API_ENDPOINT` for stand-ins), sends `Mailchimp-Supertext-Translation/<version>` in the User-Agent, and turns the SDK's error codes into the app's (`authentication_failure` → `auth`, `quota_exceeded` → `limitExceeded`, `invalid_language_pair` → `languagePair`, `unsupported_language` → `unsupportedLanguage`, `unsupported_feature` → `unsupportedFeature`, `transport_error` → `unreachable`, `incomplete_response` → `incomplete` …), which the interface shows in its four languages. *Test connection* and the automatic key check are the SDK's cost-free `checkApiKey()` (`GET features`; see *Commando Center*). The key is the account's own (Settings, AES-256-GCM encrypted with `APP_ENCRYPTION_KEY`, else a key derived from `MAILCHIMP_CLIENT_SECRET`), else `SUPERTEXT_API_KEY`. The SDK never puts the key into error details.
+`src/supertext/client.ts` creates one SDK client per account with the key and the base URL (`SUPERTEXT_API_ENDPOINT` for stand-ins), sends `Mailchimp-Supertext-Translation/<version>` in the User-Agent, and turns the SDK's error codes into the app's (`authentication_failure` → `auth`, `quota_exceeded` → `limitExceeded`, `invalid_language_pair` → `languagePair`, `unsupported_language` → `unsupportedLanguage`, `unsupported_feature` → `unsupportedFeature`, `transport_error` → `unreachable`, `incomplete_response` → `incomplete` …), which the interface shows in its four languages. *Test connection* and the automatic key check are the SDK's cost-free `checkApiKey()` (`GET features`; see *Commando Center*). The key is the account's own (Settings, AES-256-GCM encrypted with `APP_ENCRYPTION_KEY`, else a key derived from `MAILCHIMP_CLIENT_SECRET`), else `SUPERTEXT_API_KEY`, but only for the account `SUPERTEXT_API_KEY_ACCOUNT` names (`serverApiKey()` in `src/config.ts`), so nobody who connects their Mailchimp account can translate on the server's key. The SDK never puts the key into error details.
 
 **Translation review** (`Account.reviewLanguages`, a checkbox per language under Settings → Languages, stored with the account's other settings in its JSON, so existing accounts start with `[]`, review off): `runJob` takes `supertext.forReview(account.reviewLanguages.includes(language))` for each language, a second SDK client with the same key, timeouts, `fetch` and User-Agent whose base URL is `SUPERTEXT_REVIEW_URL` (`Config.reviewUrl`, default `REVIEW_URL` in `src/supertext/client.ts`, the translation proxy of [Supertext Localization Review](https://github.com/Supertext/Localization-Review-Supertext-Translation)), created once per account client. `translateSegments` does the whole round trip (upload, status, download, delete) on one client, so a document is always collected where it was submitted. The proxy speaks the same API v1, forwards to the live Supertext API with the account's key, stores every segment per key and serves reviewers' corrections on the next upload, so nothing else changes in the app. `SUPERTEXT_REVIEW_URL=` (empty) or the same URL as the API means `forReview()` always returns the direct client, and the settings page hides the column. The key check (*Test connection*, Commando Center), version reports and translation-file export/import never use the review service. Tests: `tests/supertext.test.ts` (all four calls at the review URL, other languages direct, off when empty or equal to the API URL, the default) and `tests/flow.test.ts` (the setting saved and shown, a job with one review and one direct language; `tests/helpers.ts` routes `review.test` to the stand-in and records every Supertext request in `supertextRequests`).
 
@@ -162,7 +162,7 @@ Requirements: Node.js 22.12+ (CI runs the tests and the smoke test on Node 22, 2
 npm install
 npm run standin            # stand-in Mailchimp :8766, stand-in Supertext :8765
 MAILCHIMP_CLIENT_ID=standin MAILCHIMP_CLIENT_SECRET=standin-secret MAILCHIMP_LOGIN_BASE=http://127.0.0.1:8766 \
-SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/ SUPERTEXT_API_KEY=any FOLDER_POLL_SECONDS=5 npm run dev
+SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/ SUPERTEXT_API_KEY=any SUPERTEXT_API_KEY_ACCOUNT=48210377 FOLDER_POLL_SECONDS=5 npm run dev
 # open http://127.0.0.1:8080 and click Connect Mailchimp (the stand-in approves at once)
 ```
 
@@ -226,7 +226,7 @@ It needs `ffmpeg` and writes 1280×720 at 30 fps. The GIF (800 px, 12 fps, keep 
 
 What runs:
 
-1. The app's `Dockerfile` is built (as on Railway; layers cached between runs) and started with `SUPERTEXT_API_KEY` from the GitHub secret, `MAILCHIMP_LOGIN_BASE` pointing at the stand-in Mailchimp (`npx tsx tests/standin/server.ts`, port 8766), `SUPERTEXT_VERSION_REPORTS=0` (CI runs aren't installations for the Commando Center) and `FOLDER_POLL_SECONDS=0`. Session and encryption secrets are random per run and masked in the log.
+1. The app's `Dockerfile` is built (as on Railway; layers cached between runs) and started with `SUPERTEXT_API_KEY` from the GitHub secret (for the stand-in's account, `SUPERTEXT_API_KEY_ACCOUNT=48210377`), `MAILCHIMP_LOGIN_BASE` pointing at the stand-in Mailchimp (`npx tsx tests/standin/server.ts`, port 8766), `SUPERTEXT_VERSION_REPORTS=0` (CI runs aren't installations for the Commando Center) and `FOLDER_POLL_SECONDS=0`. Session and encryption secrets are random per run and masked in the log.
 2. `tests/e2e/features.mjs` asks the real API's `GET features` (no cost, no app or SDK code) whether it offers every pair the test translates: `en` → `de-CH`, `fr-CH`, `it-CH` (`E2E_SOURCE`, `E2E_TARGETS`).
 3. `tests/e2e/live.ts` (Playwright and the repo's own dev dependencies) uses the app's pages like an editor: *Connect Mailchimp* (the stand-in approves at once), Settings → English, German `de-CH`, French `fr-CH`, Italian `it-CH`, *Test connection* (the real key check; the key itself is never typed into the page, the app uses `SUPERTEXT_API_KEY`), then on the Translate page every sample campaign (the template campaign, the HTML campaign and the sent one) into all three languages. It then checks in the stand-in Mailchimp:
    - exactly one draft per campaign and language (`<title> · DE`), status *save* (nothing sent), the originals' content untouched;
@@ -250,7 +250,7 @@ Locally (no Docker needed; your own key, never a shared one):
 npm run build
 npx tsx tests/standin/server.ts &
 MAILCHIMP_CLIENT_ID=e2e MAILCHIMP_CLIENT_SECRET=e2e MAILCHIMP_LOGIN_BASE=http://127.0.0.1:8766 \
-SUPERTEXT_API_KEY=<your key> SUPERTEXT_VERSION_REPORTS=0 FOLDER_POLL_SECONDS=0 PORT=8081 node dist/server.js &
+SUPERTEXT_API_KEY=<your key> SUPERTEXT_API_KEY_ACCOUNT=48210377 SUPERTEXT_VERSION_REPORTS=0 FOLDER_POLL_SECONDS=0 PORT=8081 node dist/server.js &
 SUPERTEXT_API_KEY=<your key> E2E_SOURCE=en E2E_TARGETS=de-CH,fr-CH,it-CH node tests/e2e/features.mjs
 npx tsx tests/e2e/live.ts     # APP_URL, MAILCHIMP_URL default to :8081 and :8766
 ```
@@ -285,7 +285,8 @@ The service **Mailchimp** in the Railway project *supertext-cms-demos* builds th
 | `SESSION_SECRET` | random secret for session cookies |
 | `DATABASE_URL` | the shared Postgres service's URL with database `mailchimp_supertext` (created on first start) |
 | `APP_ENCRYPTION_KEY` | random secret for stored tokens and keys; optional (falls back to the client secret) |
-| `SUPERTEXT_API_KEY` | optional default key (the demo account) |
+| `SUPERTEXT_API_KEY` | optional: a key for **one** account only, the demo account named by `SUPERTEXT_API_KEY_ACCOUNT` |
+| `SUPERTEXT_API_KEY_ACCOUNT` | the Mailchimp account ID that may use `SUPERTEXT_API_KEY`; without it the server's key is used for no account (every other account enters its own key) |
 | `SUPERTEXT_REVIEW_URL` | optional: the review service for languages with *Translation review* on (default: Supertext's review service; empty turns review off for every account and hides the setting) |
 | `FOLDER_POLL_SECONDS` | optional, default 60 |
 | `SUPERTEXT_VERSION_REPORTS` | optional; `0` turns the version reports off for every account |

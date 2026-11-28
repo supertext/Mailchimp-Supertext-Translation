@@ -118,6 +118,22 @@ describe('settings', () => {
 });
 
 describe('translating from the app', () => {
+  it("uses the server's key only for the account SUPERTEXT_API_KEY_ACCOUNT names", async () => {
+    const env = setup({ SUPERTEXT_API_KEY_ACCOUNT: '999' });
+    await env.connect();
+    await env.saveSettings(STANDARD_SETTINGS);
+    const response = await env.api('POST', '/api/jobs', { campaignId: 'c-autumn', languages: ['de'] });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'noApiKey' } });
+    expect(await (await env.request('/settings')).text()).not.toContain('the app uses the key set on the server');
+
+    // Without SUPERTEXT_API_KEY_ACCOUNT the key is used for no account.
+    const none = setup({ SUPERTEXT_API_KEY_ACCOUNT: '' });
+    await none.connect();
+    await none.saveSettings(STANDARD_SETTINGS);
+    expect((await none.api('POST', '/api/jobs', { campaignId: 'c-autumn', languages: ['de'] })).status).toBe(400);
+  });
+
   it('lists campaigns and creates one draft per language with translated texts and segments', async () => {
     const env = setup();
     await env.connect();

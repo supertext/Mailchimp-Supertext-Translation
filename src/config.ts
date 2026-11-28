@@ -14,8 +14,13 @@ export interface Config {
   mailchimpApiBase: string;
   /** Signs session cookies; falls back to a key derived from the client secret. */
   sessionSecret: string;
-  /** Default Supertext API key for accounts that haven't entered their own (the demo account). */
+  /**
+   * SUPERTEXT_API_KEY: a Supertext API key on the server, for ONE Mailchimp account only (the demo
+   * account): SUPERTEXT_API_KEY_ACCOUNT, its Mailchimp account ID. Without it the key is used for
+   * no account. Every other account enters its own key. See serverApiKey().
+   */
   supertextApiKey: string;
+  supertextApiKeyAccount: string;
   supertextEndpoint: string;
   /**
    * SUPERTEXT_REVIEW_URL: the review service for languages with Translation review on
@@ -44,6 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     mailchimpApiBase: (env.MAILCHIMP_API_BASE ?? '').replace(/\/+$/, ''),
     sessionSecret: env.SESSION_SECRET ?? '',
     supertextApiKey: env.SUPERTEXT_API_KEY ?? '',
+    supertextApiKeyAccount: (env.SUPERTEXT_API_KEY_ACCOUNT ?? '').trim(),
     supertextEndpoint: env.SUPERTEXT_API_ENDPOINT ?? '',
     reviewUrl: (env.SUPERTEXT_REVIEW_URL ?? REVIEW_URL).trim(),
     databaseUrl: env.DATABASE_URL ?? '',
@@ -52,4 +58,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     reportUrl: env.SUPERTEXT_REPORT_URL ?? '',
     pollSeconds: Number.isFinite(poll) && env.FOLDER_POLL_SECONDS !== undefined && env.FOLDER_POLL_SECONDS !== '' ? Math.max(0, poll) : 60,
   };
+}
+
+/**
+ * The server's Supertext API key for an account: SUPERTEXT_API_KEY, but only for the account
+ * SUPERTEXT_API_KEY_ACCOUNT names ('' for every other account, and when that is not set), so the
+ * key on the server can't be used by whoever connects their Mailchimp account.
+ */
+export function serverApiKey(config: Pick<Config, 'supertextApiKey' | 'supertextApiKeyAccount'>, accountId: string): string {
+  if (!config.supertextApiKey || !config.supertextApiKeyAccount) return '';
+  return config.supertextApiKeyAccount === accountId ? config.supertextApiKey : '';
 }

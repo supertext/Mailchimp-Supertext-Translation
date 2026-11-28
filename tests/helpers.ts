@@ -30,6 +30,7 @@ export function setup(env: Record<string, string> = {}) {
     SESSION_SECRET: 'session-secret',
     SUPERTEXT_API_ENDPOINT: 'https://supertext.test/v1/',
     SUPERTEXT_API_KEY: 'server-key',
+    SUPERTEXT_API_KEY_ACCOUNT: '48210377',
     SUPERTEXT_REVIEW_URL: 'https://review.test/v1/',
     // Version reports go to the stand-in (supertext.reports), never to the live Commando Center.
     SUPERTEXT_REPORT_URL: 'https://center.test/api/v1/report',

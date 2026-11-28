@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { SESSION_COOKIE, Sessions, STATE_COOKIE } from './auth/session.js';
-import type { Config } from './config.js';
+import { serverApiKey, type Config } from './config.js';
 import { errorInfo, LocalizedError, type ErrorInfo } from './i18n/error.js';
 import { localeFromRequest, translator, type Translator } from './i18n/index.js';
 import { authorizeUrl, exchangeCode, MailchimpClient } from './mailchimp/client.js';
@@ -42,7 +42,7 @@ export function services(deps: AppDeps) {
     });
   const supertext = (account: Account) =>
     new SupertextClient({
-      apiKey: account.apiKey || config.supertextApiKey,
+      apiKey: account.apiKey || serverApiKey(config, account.accountId),
       endpoint: config.supertextEndpoint || undefined,
       reviewEndpoint: config.reviewUrl,
       fetch: deps.fetch,
@@ -65,7 +65,7 @@ export function createApp(deps: AppDeps) {
   const { mailchimp, jobDeps, reporting } = services(deps);
   /** Back-end requests that run the app's code: the reporter notices upgrades and changed keys (in the background). */
   const onRequest = (account: Account) => void reporting.inBackground(account, 'onRequest');
-  const hasKey = (account: Account) => Boolean(account.apiKey || config.supertextApiKey);
+  const hasKey = (account: Account) => Boolean(account.apiKey || serverApiKey(config, account.accountId));
   const secure = config.appUrl.startsWith('https://');
   const configured = Boolean(config.mailchimpClientId && config.mailchimpClientSecret);
   const redirectUri = `${config.appUrl}/oauth/callback`;
@@ -374,7 +374,7 @@ export function createApp(deps: AppDeps) {
         SettingsPage({
           ctx: pageContext(t, 'settings', session),
           account: session.account,
-          serverKey: Boolean(config.supertextApiKey),
+          serverKey: Boolean(serverApiKey(config, session.account.accountId)),
           reportsEnabled: reporting.enabled(session.account),
           reportsFixed: reporting.fixedByEnvironment,
           reviewAvailable: Boolean(config.reviewUrl),

@@ -9,6 +9,7 @@ describe('reporting glue', () => {
   const config = loadConfig({
     SUPERTEXT_API_ENDPOINT: 'https://supertext.test/v1/',
     SUPERTEXT_API_KEY: 'server-key',
+    SUPERTEXT_API_KEY_ACCOUNT: '48210377',
     SUPERTEXT_REPORT_URL: 'https://center.test/api/v1/report',
   });
 

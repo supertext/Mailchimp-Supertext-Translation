@@ -109,7 +109,7 @@ jobs:
             -e PORT=8081 -e APP_URL \
             -e MAILCHIMP_CLIENT_ID=e2e -e MAILCHIMP_CLIENT_SECRET -e MAILCHIMP_LOGIN_BASE="$MAILCHIMP_URL" \
             -e SESSION_SECRET -e APP_ENCRYPTION_KEY \
-            -e SUPERTEXT_API_KEY -e SUPERTEXT_VERSION_REPORTS=0 -e FOLDER_POLL_SECONDS=0 \
+            -e SUPERTEXT_API_KEY -e SUPERTEXT_API_KEY_ACCOUNT=48210377 -e SUPERTEXT_VERSION_REPORTS=0 -e FOLDER_POLL_SECONDS=0 \
             mailchimp-supertext-app
           timeout 120 sh -c "until curl -sf -o /dev/null $APP_URL/health && curl -sf -o /dev/null -H 'Authorization: Bearer standin-token' $MAILCHIMP_URL/3.0/ping; do sleep 2; done" \
             || { docker logs app-live; cat standin-live.log; exit 1; }

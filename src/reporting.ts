@@ -22,7 +22,7 @@ import {
 } from 'supertext-plugin-health';
 import { SDK_VERSION } from 'supertext-sdk';
 import { apiKeyFingerprint, SupertextClient as SdkClient, type ApiKeyCheck, type SupertextClientOptions } from 'supertext-sdk/v1';
-import type { Config } from './config.js';
+import { serverApiKey, type Config } from './config.js';
 import type { Account, Store } from './store/store.js';
 import { USER_AGENT } from './supertext/client.js';
 import { VERSION } from './version.js';
@@ -76,8 +76,8 @@ export class Reporting {
   }
 
   /** The key the account's translations use. */
-  apiKey(account: Pick<Account, 'apiKey'>): string {
-    return account.apiKey || this.deps.config.supertextApiKey;
+  apiKey(account: Pick<Account, 'apiKey' | 'accountId'>): string {
+    return account.apiKey || serverApiKey(this.deps.config, account.accountId);
   }
 
   reporter(account: Account, languages?: LanguageMapping[]): InstallationReporter {
