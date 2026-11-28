@@ -1,0 +1,8 @@
+# ZAP alerts the app accepts (scripts/zap.sh, CI: security-scan.yml). Format: rule id, IGNORE/WARN/FAIL, reason.
+10029	IGNORE	(Cookie Poisoning) ?lang= only accepts en, de, fr, it
+10031	IGNORE	(User Controllable HTML Element Attribute) ?lang= is checked against en, de, fr, it; output is escaped
+10112	IGNORE	(Session Management Response Identified) informational: the session and OAuth state cookies
+10027	IGNORE	(Suspicious Comments) comments in the app's own script, nothing secret
+10104	IGNORE	(User Agent Fuzzer) informational
+10049	IGNORE	(Non-Storable Content) informational: pages are private (Cache-Control: no-cache, private) on purpose
+90004	IGNORE	(Cross-Origin-Embedder-Policy) the app embeds nothing from other sites; no cross-origin isolation needed

@@ -11,6 +11,7 @@ export interface PageContext {
 }
 
 export const SIGNUP_URL = 'https://www.supertext.com/person/en/account/signin';
+// nosemgrep: node_api_key -- a public URL (the page where the key is generated), not a key
 export const API_KEY_URL = 'https://www.supertext.com/en/integrations/api';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', de: 'Deutsch', fr: 'Français', it: 'Italiano' };

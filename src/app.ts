@@ -58,6 +58,25 @@ export function services(deps: AppDeps) {
   return { mailchimp, supertext, jobDeps, reporting };
 }
 
+/**
+ * Content-Security-Policy of every page: scripts, styles, fonts and images only from the app itself
+ * (images also data:, for CSS icons). No inline scripts, no plugins, no other <base>, forms only to
+ * the app, and never inside a frame.
+ */
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+export const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
+
 export function createApp(deps: AppDeps) {
   const { config, store } = deps;
   const app = new Hono();
@@ -67,6 +86,10 @@ export function createApp(deps: AppDeps) {
   const onRequest = (account: Account) => void reporting.inBackground(account, 'onRequest');
   const hasKey = (account: Account) => Boolean(account.apiKey || serverApiKey(config, account.accountId));
   const secure = config.appUrl.startsWith('https://');
+  // Every cookie: not readable by scripts, not sent on cross-site requests, HTTPS only when the app is.
+  const sessionCookieOptions = { path: '/', httpOnly: true, sameSite: 'Lax', secure } as const;
+  const stateCookieOptions = { path: '/oauth', httpOnly: true, sameSite: 'Lax', secure } as const;
+  const localeCookieOptions = { path: '/', httpOnly: true, sameSite: 'Lax', secure } as const;
   const configured = Boolean(config.mailchimpClientId && config.mailchimpClientSecret);
   const redirectUri = `${config.appUrl}/oauth/callback`;
   const oauth = {
@@ -79,16 +102,22 @@ export function createApp(deps: AppDeps) {
 
   app.use('*', async (c, next) => {
     await next();
-    c.header('Content-Security-Policy', "frame-ancestors 'none'");
+    c.header('Content-Security-Policy', CONTENT_SECURITY_POLICY);
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     c.header('X-Content-Type-Options', 'nosniff');
+    // The app needs no camera, microphone, location or other browser features.
+    c.header('Permissions-Policy', PERMISSIONS_POLICY);
+    // Browsers that saw the app over HTTPS never use plain HTTP for it again (for a year).
+    if (secure) c.header('Strict-Transport-Security', 'max-age=31536000');
+    // Pages show the account's live state: never from a cache (static files keep their own headers).
+    if (!c.req.path.startsWith('/static/')) c.header('Cache-Control', 'no-cache, private');
   });
 
   // ?lang=de switches the interface language and remembers it.
   app.use('*', async (c, next) => {
     const lang = c.req.query('lang');
     if (lang && /^(en|de|fr|it)$/.test(lang)) {
-      setCookie(c, 'st_locale', lang, { path: '/', maxAge: 365 * 86400, sameSite: 'Lax', secure });
+      setCookie(c, 'st_locale', lang, { ...localeCookieOptions, maxAge: 365 * 86400 });
     }
     await next();
   });
@@ -191,13 +220,13 @@ export function createApp(deps: AppDeps) {
   app.get('/oauth/start', (c) => {
     if (!configured) return c.redirect('/?error=notConfigured', 302);
     const { state, cookie } = sessions.state();
-    setCookie(c, STATE_COOKIE, cookie, { path: '/oauth', maxAge: 600, httpOnly: true, sameSite: 'Lax', secure });
+    setCookie(c, STATE_COOKIE, cookie, { ...stateCookieOptions, maxAge: 600 });
     return c.redirect(authorizeUrl(oauth, state), 302);
   });
 
   app.get('/oauth/callback', async (c) => {
     const stateCookie = getCookie(c, STATE_COOKIE);
-    deleteCookie(c, STATE_COOKIE, { path: '/oauth' });
+    deleteCookie(c, STATE_COOKIE, stateCookieOptions);
     if (c.req.query('error')) return c.redirect('/?denied=1', 302);
     const code = c.req.query('code');
     if (!code || !sessions.checkState(stateCookie, c.req.query('state'))) return c.redirect('/?error=session', 302);
@@ -216,13 +245,7 @@ export function createApp(deps: AppDeps) {
       }
       await store.saveAccount(account);
       console.log(`Supertext: Mailchimp account ${account.accountId} connected`);
-      setCookie(c, SESSION_COOKIE, sessions.create(account.accountId), {
-        path: '/',
-        maxAge: 30 * 86400,
-        httpOnly: true,
-        sameSite: 'Lax',
-        secure,
-      });
+      setCookie(c, SESSION_COOKIE, sessions.create(account.accountId), { ...sessionCookieOptions, maxAge: 30 * 86400 });
       return c.redirect(account.targets.length > 0 ? '/' : '/settings', 302);
     } catch (error) {
       console.error('Supertext: OAuth failed', error);
@@ -243,7 +266,7 @@ export function createApp(deps: AppDeps) {
       await store.deleteAccount(session.account.accountId);
       console.log(`Supertext: Mailchimp account ${session.account.accountId} disconnected; its data was deleted.`);
     }
-    deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    deleteCookie(c, SESSION_COOKIE, sessionCookieOptions);
     return c.redirect('/?disconnected=1', 303);
   });
 

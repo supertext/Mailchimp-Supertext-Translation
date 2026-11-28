@@ -105,7 +105,7 @@ export async function pollAccount(
       await mailchimp.updateCampaign(campaign.id, { settings: { folder_id: home } });
     } catch (error) {
       moved = false;
-      console.warn(`Supertext: could not move campaign ${campaign.id} out of the Supertext folder`, error);
+      console.warn('Supertext: could not move campaign %s out of the Supertext folder', campaign.id, error);
     }
     entries[campaign.id] = moved ? { folder: home } : { folder: home, handled: campaign.folderId };
     const languages = target === 'all' ? account.targets : [target];
@@ -144,7 +144,7 @@ export function startPoller(
         } catch (error) {
           const code = (error as { code?: string }).code;
           if (code === 'mailchimpAuth') await onTokenRefused(account);
-          else console.warn(`Supertext: folder check failed for account ${account.accountId}`, error);
+          else console.warn('Supertext: folder check failed for account %s', account.accountId, error);
         }
       }
     } finally {

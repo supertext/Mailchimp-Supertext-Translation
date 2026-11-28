@@ -75,6 +75,7 @@ jobs:
         run: |
           for v in SESSION_SECRET APP_ENCRYPTION_KEY MAILCHIMP_CLIENT_SECRET; do
             value="$(openssl rand -hex 16)"
+            # nosemgrep: unsafe-add-mask-workflow-command -- $value is random hex from openssl, not input
             echo "::add-mask::$value"
             echo "$v=$value" >> "$GITHUB_ENV"
           done

@@ -1,0 +1,58 @@
+# Security scans (the second layer of the audit, project doc claude/security-audit-mailchimp.md):
+# Semgrep on the code, and an OWASP ZAP scan of the built app against the stand-in Mailchimp and
+# Supertext APIs, logged in (scripts/zap.sh). Accepted findings: `nosemgrep` comments with their
+# reason in the code, `.zap/rules.tsv`. Anything else fails the run.
+name: Security scan
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'public/**', 'package.json', 'package-lock.json', 'Dockerfile', 'scripts/zap.sh', '.zap/**', '.github/workflows/security-scan.yml']
+  pull_request:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Semgrep
+        run: |
+          pipx install semgrep==1.187.0
+          semgrep scan --metrics=off --error --quiet \
+            --config p/default --config p/typescript --config p/nodejsscan --config p/secrets \
+            --config p/owasp-top-ten --config p/github-actions --config p/dockerfile \
+            --exclude node_modules --exclude dist --exclude vendor .
+
+  zap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - run: npm run build
+      - name: ZAP baseline scan, logged in
+        env:
+          # ZAP 2.17.0, pinned; update the digest together with a check of the results.
+          ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+        run: bash scripts/zap.sh
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zap-report
+          path: zap-report/
+          retention-days: 30

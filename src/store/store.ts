@@ -150,6 +150,9 @@ export interface Store {
 
 export const newJobId = (): string => randomUUID();
 
+/** AES-GCM authentication tag length: 16 bytes, the full length. */
+export const TAG_BYTES = 16;
+
 /** AES-256-GCM for stored tokens and API keys. */
 export class Secrets {
   private readonly key: Buffer;
@@ -162,7 +165,7 @@ export class Secrets {
   encrypt(value: string): string {
     if (!value) return '';
     const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.key, iv);
+    const cipher = createCipheriv('aes-256-gcm', this.key, iv, { authTagLength: TAG_BYTES });
     const data = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
     return ['v1', iv.toString('base64'), cipher.getAuthTag().toString('base64'), data.toString('base64')].join(':');
   }
@@ -171,9 +174,12 @@ export class Secrets {
     if (!value) return '';
     const [version, iv, tag, data] = value.split(':');
     if (version !== 'v1' || !iv || !tag || !data) return '';
+    const authTag = Buffer.from(tag, 'base64');
+    // Only full-length tags: a shortened one would make forging a value easier.
+    if (authTag.length !== TAG_BYTES) return '';
     try {
-      const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64'));
-      decipher.setAuthTag(Buffer.from(tag, 'base64'));
+      const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64'), { authTagLength: TAG_BYTES });
+      decipher.setAuthTag(authTag);
       return Buffer.concat([decipher.update(Buffer.from(data, 'base64')), decipher.final()]).toString('utf8');
     } catch {
       return '';
